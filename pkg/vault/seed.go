@@ -1,4 +1,4 @@
-package main
+package vault
 
 import (
 	"fmt"
@@ -98,9 +98,9 @@ A good skill is:
 - Versioned: save improvements as new versions, never by overwriting silently.
 `
 
-// ensureAuthoringGuide seeds the practice-authoring skill if it is missing.
-func ensureAuthoringGuide(r *libfossil.Repo, user string) error {
-	path, err := findSkillPath(r, seedName)
+// EnsureAuthoringGuide seeds the practice-authoring skill if it is missing.
+func EnsureAuthoringGuide(r *libfossil.Repo, user string) error {
+	path, err := FindSkillPath(r, SeedName)
 	if err != nil {
 		return err
 	}
@@ -116,17 +116,17 @@ func ensureAuthoringGuide(r *libfossil.Repo, user string) error {
 	}
 	rid, _, err := r.Commit(libfossil.CommitOpts{
 		Files: []libfossil.FileToCommit{
-			{Name: practicePath(seedGroup, seedName), Content: []byte(practiceAuthoringSeed)},
+			{Name: practicePath(seedGroup, SeedName), Content: []byte(practiceAuthoringSeed)},
 		},
-		Comment:  fmt.Sprintf("seed %s (v1)", seedName),
+		Comment:  fmt.Sprintf("seed %s (v1)", SeedName),
 		User:     user,
 		ParentID: parent,
 	})
 	if err != nil {
-		return fmt.Errorf("seed %s: %w", seedName, err)
+		return fmt.Errorf("seed %s: %w", SeedName, err)
 	}
 	_, err = r.Tag(libfossil.TagOpts{
-		Name:     seedName + "-v1",
+		Name:     SeedName + "-v1",
 		TargetID: rid,
 		User:     user,
 	})

@@ -1,4 +1,4 @@
-package main
+package tools
 
 import (
 	"context"
@@ -11,9 +11,12 @@ import (
 
 	libfossil "github.com/danmestas/go-libfossil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/yli/agent-vault/pkg/vault"
 )
 
-func registerVaultTools(server *mcp.Server) {
+// RegisterVaultTools registers the vault_* MCP tools on the server.
+func RegisterVaultTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "vault_init",
 		Description: "Create or open the practice vault (a Fossil repository) and ensure the practice-authoring guide is seeded. Returns vault path, project-code, and skill count.",
@@ -21,7 +24,7 @@ func registerVaultTools(server *mcp.Server) {
 		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
 		User string `json:"user,omitempty" jsonschema:"user recorded for seeded commits; defaults to admin"`
 	}) (*mcp.CallToolResult, any, error) {
-		p, err := vaultPath(args.Path)
+		p, err := vault.VaultPath(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -38,18 +41,18 @@ func registerVaultTools(server *mcp.Server) {
 			return nil, nil, err
 		}
 		defer r.Close()
-		if err := ensureAuthoringGuide(r, args.User); err != nil {
+		if err := vault.EnsureAuthoringGuide(r, args.User); err != nil {
 			return nil, nil, err
 		}
 		projectCode, err := r.Config("project-code")
 		if err != nil {
 			return nil, nil, err
 		}
-		skills, err := listSkills(r)
+		skills, err := vault.ListSkills(r)
 		if err != nil {
 			return nil, nil, err
 		}
-		return textResult(fmt.Sprintf("vault: %s\nproject-code: %s\nskills: %d (in %d practices)", p, projectCode, len(skills), len(uniqueGroups(skills)))), nil, nil
+		return textResult(fmt.Sprintf("vault: %s\nproject-code: %s\nskills: %d (in %d practices)", p, projectCode, len(skills), len(vault.UniqueGroups(skills)))), nil, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -58,7 +61,7 @@ func registerVaultTools(server *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
-		r, p, err := openVault(args.Path)
+		r, p, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -67,15 +70,15 @@ func registerVaultTools(server *mcp.Server) {
 		if err != nil {
 			return nil, nil, err
 		}
-		skills, err := listSkills(r)
+		skills, err := vault.ListSkills(r)
 		if err != nil {
 			return nil, nil, err
 		}
-		groups := uniqueGroups(skills)
+		groups := vault.UniqueGroups(skills)
 		sort.Strings(groups)
 		authoring := "not seeded"
 		for _, s := range skills {
-			if s.Name == seedName {
+			if s.Name == vault.SeedName {
 				authoring = s.LatestVersion
 				break
 			}
@@ -104,23 +107,23 @@ func registerVaultTools(server *mcp.Server) {
 		if args.Name == "" || args.Practice == "" || args.Content == "" {
 			return nil, nil, errors.New("name, practice, and content are required")
 		}
-		if !validSlug(args.Practice) {
+		if !vault.ValidSlug(args.Practice) {
 			return nil, nil, fmt.Errorf("invalid practice %q: must be 1-64 lowercase alphanumeric with single hyphens", args.Practice)
 		}
-		if err := validatePracticeContent(args.Name, args.Content); err != nil {
+		if err := vault.ValidateContent(args.Name, args.Content); err != nil {
 			return nil, nil, err
 		}
-		r, p, err := openVault(args.Path)
+		r, p, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		label, uuid, total, err := savePractice(r, args.Practice, args.Name, args.Content, args.Message, args.User, args.VersionLabel)
+		label, uuid, total, err := vault.SavePractice(r, args.Practice, args.Name, args.Content, args.Message, args.User, args.VersionLabel)
 		if err != nil {
 			return nil, nil, err
 		}
 		return textResult(fmt.Sprintf("saved %s/%s\nversion: %s (%s)\ntotal versions: %d\nvault: %s",
-			args.Practice, args.Name, label, shortUUID(uuid), total, p)), nil, nil
+			args.Practice, args.Name, label, vault.ShortUUID(uuid), total, p)), nil, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -134,12 +137,12 @@ func registerVaultTools(server *mcp.Server) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
 		}
-		r, _, err := openVault(args.Path)
+		r, _, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		content, err := readSkillAtVersion(r, args.Name, args.Version)
+		content, err := vault.ReadSkillAtVersion(r, args.Name, args.Version)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -155,17 +158,17 @@ func registerVaultTools(server *mcp.Server) {
 		Practice string `json:"practice,omitempty" jsonschema:"only list skills under this practice group"`
 		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
-		r, _, err := openVault(args.Path)
+		r, _, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		skills, err := listSkills(r)
+		skills, err := vault.ListSkills(r)
 		if err != nil {
 			return nil, nil, err
 		}
 		q := strings.ToLower(args.Query)
-		var matches []skillInfo
+		var matches []vault.SkillInfo
 		for _, s := range skills {
 			if args.Practice != "" && s.Group != args.Practice {
 				continue
@@ -217,19 +220,19 @@ func registerVaultTools(server *mcp.Server) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
 		}
-		r, _, err := openVault(args.Path)
+		r, _, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		path, err := findSkillPath(r, args.Name)
+		path, err := vault.FindSkillPath(r, args.Name)
 		if err != nil {
 			return nil, nil, err
 		}
 		if path == "" {
 			return nil, nil, fmt.Errorf("skill %q not found in vault", args.Name)
 		}
-		hist, err := skillHistory(r, path)
+		hist, err := vault.SkillHistory(r, path)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -238,7 +241,7 @@ func registerVaultTools(server *mcp.Server) {
 		}
 		var b strings.Builder
 		for _, v := range hist {
-			fmt.Fprintf(&b, "%s  %s  %s  %s  %s\n", v.Label, shortUUID(v.UUID),
+			fmt.Fprintf(&b, "%s  %s  %s  %s  %s\n", v.Label, vault.ShortUUID(v.UUID),
 				v.Date.Format("2006-01-02 15:04:05"), v.User, v.Message)
 		}
 		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
@@ -248,27 +251,27 @@ func registerVaultTools(server *mcp.Server) {
 		Name:        "vault_practice_diff",
 		Description: "Unified diff of a skill between two versions. If version_a is empty, diffs against the previous version.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		Name      string `json:"name" jsonschema:"skill name (required)"`
-		VersionB  string `json:"version_b" jsonschema:"newer version (vN label or UUID prefix) (required)"`
-		VersionA  string `json:"version_a,omitempty" jsonschema:"older version; defaults to the version before version_b"`
-		Path      string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Name     string `json:"name" jsonschema:"skill name (required)"`
+		VersionB string `json:"version_b" jsonschema:"newer version (vN label or UUID prefix) (required)"`
+		VersionA string `json:"version_a,omitempty" jsonschema:"older version; defaults to the version before version_b"`
+		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" || args.VersionB == "" {
 			return nil, nil, errors.New("name and version_b are required")
 		}
-		r, _, err := openVault(args.Path)
+		r, _, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		path, err := findSkillPath(r, args.Name)
+		path, err := vault.FindSkillPath(r, args.Name)
 		if err != nil {
 			return nil, nil, err
 		}
 		if path == "" {
 			return nil, nil, fmt.Errorf("skill %q not found in vault", args.Name)
 		}
-		uuidA, uuidB, err := resolveDiffVersions(r, path, args.VersionA, args.VersionB)
+		uuidA, uuidB, err := vault.ResolveDiffVersions(r, path, args.VersionA, args.VersionB)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -311,12 +314,12 @@ func registerVaultTools(server *mcp.Server) {
 		if args.Format == "" {
 			args.Format = "opencode"
 		}
-		r, p, err := openVault(args.Path)
+		r, p, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		rel, err := installPractice(r, p, args.Name, args.Version, args.Target, args.Format, args.Force)
+		rel, err := vault.InstallPractice(r, p, args.Name, args.Version, args.Target, args.Format, args.Force)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -335,165 +338,15 @@ func registerVaultTools(server *mcp.Server) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
 		}
-		r, _, err := openVault(args.Path)
+		r, _, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		content, err := readSkillAtVersion(r, args.Name, args.Version)
+		content, err := vault.ReadSkillAtVersion(r, args.Name, args.Version)
 		if err != nil {
 			return nil, nil, err
 		}
 		return textResult(content), nil, nil
 	})
-}
-
-// skillInfo is a listing entry for a skill.
-type skillInfo struct {
-	Name          string
-	Group         string
-	Description   string
-	Tags          string
-	LatestVersion string
-	LatestUUID    string
-}
-
-// listSkills enumerates all skills at the vault tip.
-func listSkills(r *libfossil.Repo) ([]skillInfo, error) {
-	rid, err := r.ResolveVersion("tip")
-	if errors.Is(err, libfossil.ErrVersionNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	files, err := r.ListFiles(rid)
-	if err != nil {
-		return nil, err
-	}
-	var out []skillInfo
-	for _, f := range files {
-		group, name, ok := parseSkillPath(f.Name)
-		if !ok {
-			continue
-		}
-		content, err := r.ReadFileAt("tip", f.Name)
-		if err != nil {
-			continue
-		}
-		meta, _, err := splitFrontmatter(string(content))
-		if err != nil {
-			continue
-		}
-		hist, err := skillHistory(r, f.Name)
-		if err != nil {
-			return nil, err
-		}
-		info := skillInfo{
-			Name:        name,
-			Group:       group,
-			Description: meta.Description,
-			Tags:        meta.Metadata["tags"],
-		}
-		if len(hist) > 0 {
-			info.LatestVersion = hist[len(hist)-1].Label
-			info.LatestUUID = hist[len(hist)-1].UUID
-		} else {
-			info.LatestVersion = "v1"
-		}
-		out = append(out, info)
-	}
-	return out, nil
-}
-
-func uniqueGroups(skills []skillInfo) []string {
-	seen := map[string]bool{}
-	var groups []string
-	for _, s := range skills {
-		if !seen[s.Group] {
-			seen[s.Group] = true
-			groups = append(groups, s.Group)
-		}
-	}
-	return groups
-}
-
-// readSkillAtVersion returns the raw content of a skill at a version.
-func readSkillAtVersion(r *libfossil.Repo, name, version string) (string, error) {
-	path, err := findSkillPath(r, name)
-	if err != nil {
-		return "", err
-	}
-	if path == "" {
-		return "", fmt.Errorf("skill %q not found in vault", name)
-	}
-	uuid, err := resolveSkillVersion(r, path, version)
-	if err != nil {
-		return "", err
-	}
-	data, err := r.ReadFileAt(uuid, path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-func resolveDiffVersions(r *libfossil.Repo, path, versionA, versionB string) (string, string, error) {
-	uuidB, err := resolveSkillVersion(r, path, versionB)
-	if err != nil {
-		return "", "", err
-	}
-	if versionA != "" {
-		uuidA, err := resolveSkillVersion(r, path, versionA)
-		if err != nil {
-			return "", "", err
-		}
-		return uuidA, uuidB, nil
-	}
-	hist, err := skillHistory(r, path)
-	if err != nil {
-		return "", "", err
-	}
-	for i, v := range hist {
-		if v.UUID == uuidB {
-			if i == 0 {
-				return "", "", fmt.Errorf("no previous version of %s to diff against", path)
-			}
-			return hist[i-1].UUID, uuidB, nil
-		}
-	}
-	return "", "", fmt.Errorf("version %s not found in history of %s", versionB, path)
-}
-
-func openVault(path string) (*libfossil.Repo, string, error) {
-	p, err := vaultPath(path)
-	if err != nil {
-		return nil, "", err
-	}
-	r, err := libfossil.Open(p)
-	if err != nil {
-		return nil, "", fmt.Errorf("vault not initialized at %s (run vault_init first): %w", p, err)
-	}
-	return r, p, nil
-}
-
-func vaultPath(arg string) (string, error) {
-	if arg != "" {
-		return filepath.Clean(arg), nil
-	}
-	if env := os.Getenv("AGENT_VAULT_REPO"); env != "" {
-		return filepath.Clean(env), nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".agent-vault", "vault.fossil"), nil
-}
-
-func versionLabelOrTip(v string) string {
-	if v == "" {
-		return "tip"
-	}
-	return v
 }

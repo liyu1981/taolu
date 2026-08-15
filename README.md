@@ -12,7 +12,7 @@ Fossil SCM is the underlying storage engine via [go-libfossil](https://github.co
 ## Build
 
 ```sh
-go build -o agent-vault .
+go build -o agent-vault ./cmd/agent-vault
 ```
 
 The binary is an MCP server that speaks newline-delimited JSON-RPC over stdio.
@@ -37,7 +37,7 @@ to summarize projects and author new skills.
   "mcp": {
     "agent-vault": {
       "type": "local",
-      "command": ["go", "run", "."],
+      "command": ["go", "run", "./cmd/agent-vault"],
       "environment": {
         "AGENT_VAULT_REPO": "/home/you/.agent-vault/vault.fossil"
       }
@@ -53,7 +53,7 @@ to summarize projects and author new skills.
   "mcpServers": {
     "agent-vault": {
       "command": "go",
-      "args": ["run", "."]
+      "args": ["run", "./cmd/agent-vault"]
     }
   }
 }

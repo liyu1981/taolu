@@ -1,7 +1,6 @@
-package main
+package tools
 
 import (
-	_ "github.com/danmestas/go-libfossil/db/driver/modernc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -13,9 +12,9 @@ func textResult(text string) *mcp.CallToolResult {
 	}
 }
 
-func shortUUID(uuid string) string {
-	if len(uuid) > 12 {
-		return uuid[:12]
+func versionLabelOrTip(v string) string {
+	if v == "" {
+		return "tip"
 	}
-	return uuid
+	return v
 }
