@@ -1,5 +1,42 @@
 # taolu
 
+A **versioned, cross-project convention library for AI agents**. Agents learn a
+project's conventions once, store them as reusable *taolus*, and apply them —
+pinned to a version — into any project.
+
+## The problem
+
+AI coding agents have no durable memory of how a project is meant to be built.
+Every repo and every agent session starts from zero: architecture and layering,
+naming, error handling, testing, commit style — the house conventions live in the
+developer's head or scattered docs. Teams cope by copying skills and prompts
+between projects, which drift out of sync, have no versioning, and can never be
+cleanly revoked or upgraded.
+
+## Use cases
+
+- **Reuse conventions across projects.** Write one taolu for a house pattern
+  (e.g. `go-api-server`, `react-button-component`), then `install` it into any
+  project so new agents start already knowing the house style.
+- **Enforce a project-wide standard.** `enforce` mode installs the skill and
+  adds a compliance reference to the project's `AGENTS.md`, so every agent that
+  touches the repo follows it — with a version pin to upgrade or roll back.
+- **Carry code and components.** A taolu bundles more than prose: its `files/`
+  directory holds templates and complete multi-file components (e.g. a React
+  component with `.tsx`, `.css`, and tests) that install verbatim into a new
+  project, preserving the tree.
+- **Upgrade and roll back.** Every save is an immutable version. Read history
+  and diffs, bump the pin to a newer version, or roll back to an older one —
+  nothing is lost and the old state stays readable.
+- **Share a team convention library.** The vault is a single Fossil repo; sync
+  it and every agent on the team works from the same versioned, searchable set
+  of conventions.
+- **Onboard agents to a codebase.** `apply` a taolu once for a one-shot task,
+  or `taolu_list`/`taolu_get` to find the right convention and read it before
+  doing the work.
+
+## What it is
+
 An MCP server for a **versioned taolu library** ("the vault"). A **taolu** is a
 skill plus an action: a `SKILL.md` that captures a project's conventions paired
 with an `ACTION.md` that tells the agent what to do with it (apply once, install,
