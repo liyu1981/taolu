@@ -109,6 +109,10 @@ Every taolu's skill is a SKILL.md document with YAML frontmatter:
     The concrete, actionable instructions.
 
 - The name must match the save name.
+- Use a generic name that describes the convention itself, not a project-specific
+  one (e.g. glass-webui-design, not mindx-glass-webui-design). A taolu should be
+  reusable across projects, so keep the source project out of the name and put
+  any project context in the description and metadata tags instead.
 - Keep the description specific enough that an agent can choose correctly.
 - Use concrete, actionable instructions. Prefer small, focused taolus.
 
@@ -164,6 +168,7 @@ Before saving or applying the taolu, get explicit approval:
 A good taolu is:
 
 - Specific: it captures real conventions of a real project, not generic advice.
+- Reusable: a generic name that describes the convention, not the source project.
 - Actionable: an agent can follow it without guessing.
 - Small: one topic per taolu.
 - Findable: a clear description and metadata tags.
