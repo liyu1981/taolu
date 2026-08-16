@@ -15,7 +15,7 @@ cd "$(dirname "$0")"
 CMD="${1:-start}"
 
 export TAOLU_REPO="${TAOLU_REPO:-$PWD/var/vault.fossil}"
-export TAOLU_HOST="${TAOLU_HOST:-127.0.0.1}"
+export TAOLU_HOST="${TAOLU_HOST:-0.0.0.0}"
 export TAOLU_PORT="${TAOLU_PORT:-8264}"
 MAX_LOG_BYTES="${MAX_LOG_BYTES:-5242880}"
 
