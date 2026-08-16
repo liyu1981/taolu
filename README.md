@@ -32,9 +32,11 @@ a single process and there is no SQLite lock contention.
 
 On startup the server **creates and seeds the default vault if it does not
 exist** (creating `~/.taolu/vault.fossil`, seeding the `taolu-authoring` guide,
-and migrating any legacy `practices/` tree), so it is usable immediately. The
-`taolu_init` tool is only needed to initialize or re-inspect a non-default vault
-path.
+and migrating any legacy `practices/` tree), so it is usable immediately. When
+the bundled guide changes in a release, existing vaults are **upgraded to a new
+version** of `taolu-authoring` rather than left stale; the old version stays in
+history. The `taolu_init` tool is only needed to initialize or re-inspect a
+non-default vault path.
 
 ## Configuration
 

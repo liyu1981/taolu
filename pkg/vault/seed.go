@@ -209,39 +209,31 @@ Apply this taolu by reading the accompanying skill and following it whenever
 you summarize a project or author, save, or apply taolus.
 `
 
-// EnsureAuthoringGuide seeds the taolu-authoring guide if it is missing.
+// EnsureAuthoringGuide seeds the taolu-authoring guide if it is missing, or
+// upgrades it to a new version when the bundled content has changed since the
+// last seed/upgrade. The vault is an SCM, so upgrades are reversible: the
+// previous version stays in history and can be read via taolu_history.
 func EnsureAuthoringGuide(r *libfossil.Repo, user string) error {
 	path, err := FindSkillPath(r, SeedName)
 	if err != nil {
 		return err
 	}
+	message := fmt.Sprintf("seed %s (v1)", SeedName)
 	if path != "" {
-		return nil
+		skillData, err := r.ReadFileAt("tip", path)
+		if err != nil {
+			return err
+		}
+		actionData, err := r.ReadFileAt("tip", filepath.Join(filepath.Dir(path), "ACTION.md"))
+		if err != nil {
+			return err
+		}
+		if string(skillData) == taoluAuthoringSkill && string(actionData) == taoluAuthoringAction {
+			return nil
+		}
+		message = "upgrade " + SeedName + " to match the bundled seed"
 	}
-	parent, err := resolveParentTip(r)
-	if err != nil {
-		return err
-	}
-	if user == "" {
-		user = "admin"
-	}
-	rid, _, err := r.Commit(libfossil.CommitOpts{
-		Files: []libfossil.FileToCommit{
-			{Name: skillPath(seedGroup, SeedName), Content: []byte(taoluAuthoringSkill)},
-			{Name: actionPath(seedGroup, SeedName), Content: []byte(taoluAuthoringAction)},
-		},
-		Comment:  fmt.Sprintf("seed %s (v1)", SeedName),
-		User:     user,
-		ParentID: parent,
-	})
-	if err != nil {
-		return fmt.Errorf("seed %s: %w", SeedName, err)
-	}
-	_, err = r.Tag(libfossil.TagOpts{
-		Name:     SeedName + "-v1",
-		TargetID: rid,
-		User:     user,
-	})
+	_, _, _, err = SaveTaolu(r, seedGroup, SeedName, taoluAuthoringSkill, taoluAuthoringAction, nil, message, user, "")
 	return err
 }
 
