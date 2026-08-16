@@ -51,17 +51,21 @@ specify it, ask and confirm before summarizing:
 
 Do not invent a scope and start drafting; confirm it first.
 
-### 2. Confirm the action
+### 2. Confirm the action (strict gate)
 
-Decide the action mode with the user. If the user did not specify it, confirm
-with the user before proceeding — do not default silently:
+The action mode is a hard gate: do not proceed until the user has explicitly
+chosen **apply**, **install**, or **enforce**. Never guess, never default
+silently, and never proceed with an unstated mode. If the user has not
+specified one, stop and ask:
 
 - **apply**: use once on the current project, nothing saved.
 - **install**: make the skill available in the project's skill store.
 - **enforce**: a project-wide convention every agent must follow (installs and
   adds an AGENTS.md reference).
 
-State the confirmed mode back to the user so the choice is explicit.
+Restate the confirmed mode back to the user before moving on. If the answer is
+ambiguous, ask again until the choice is explicit. Do not infer the mode from
+context.
 
 ### 3. Survey the project
 
@@ -123,15 +127,19 @@ Use the action mode confirmed in step 2:
 - Choose **enforce** for a project-wide convention that every agent must
   follow (installs and adds an AGENTS.md reference).
 
-### 7. Review before sending out
+### 7. Review and get explicit approval before sending out
 
-Before sending out the taolu (saving it or applying it), ask the user to
-review it:
+Before saving or applying the taolu, get explicit approval:
 
 - Present the taolu for review. If the taolu is long, provide a brief of it
   (name, group, action mode, one-line description, and a short summary of the
   conventions it captures) and offer the option to review it in full length.
-- Only save or apply after the user has reviewed and approved.
+- Ask for approval through the interactive UI when one is available — for
+  example, opencode's ask tool or any elicitation prompt the client exposes.
+  Fall back to a plain text prompt only when no UI mechanism exists.
+- Treat approval as a hard gate: do not call taolu_save or taolu_apply until
+  the user has explicitly approved. Silence or an absent reply is **not**
+  approval.
 
 ## How to save / update
 
@@ -140,7 +148,7 @@ review it:
 - The server validates both, commits them together, and labels the new version
   (v1, v2, ...). Provide a concise message describing the change.
 - Saving again with the same name creates a new version; nothing is lost.
-- Always review the taolu with the user first (see step 7 above) before saving;
+- Always review and get explicit approval before saving (see step 7 above);
   when updating an existing taolu, show what changed.
 
 ## How to apply / upgrade / roll back
