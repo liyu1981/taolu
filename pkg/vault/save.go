@@ -6,22 +6,24 @@ import (
 	libfossil "github.com/danmestas/go-libfossil"
 )
 
-// SavePractice commits content as a new version of the skill.
-func SavePractice(r *libfossil.Repo, group, name, content, message, user, versionLabel string) (label, uuid string, total int, err error) {
+// SaveTaolu commits skill and action content as a new version of the taolu.
+// The pair is always changed together in a single check-in.
+func SaveTaolu(r *libfossil.Repo, group, name, skill, action, message, user, versionLabel string) (label, uuid string, total int, err error) {
 	if user == "" {
 		user = "admin"
 	}
-	targetPath := practicePath(group, name)
+	sp := skillPath(group, name)
+	ap := actionPath(group, name)
 	existing, err := FindSkillPath(r, name)
 	if err != nil {
 		return "", "", 0, err
 	}
-	if existing != "" && existing != targetPath {
-		return "", "", 0, fmt.Errorf("skill %q already exists under practice %q (path %s); refusing to save under %q",
+	if existing != "" && existing != sp {
+		return "", "", 0, fmt.Errorf("taolu %q already exists under group %q (path %s); refusing to save under %q",
 			name, skillGroup(existing), existing, group)
 	}
 
-	hist, err := SkillHistory(r, targetPath)
+	hist, err := SkillHistory(r, sp)
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -34,12 +36,13 @@ func SavePractice(r *libfossil.Repo, group, name, content, message, user, versio
 		return "", "", 0, err
 	}
 	if message == "" {
-		message = fmt.Sprintf("save %s (%s)", name, versionLabel)
+		message = fmt.Sprintf("save taolu %s (%s)", name, versionLabel)
 	}
 
 	rid, commitUUID, err := r.Commit(libfossil.CommitOpts{
 		Files: []libfossil.FileToCommit{
-			{Name: targetPath, Content: []byte(content)},
+			{Name: sp, Content: []byte(skill)},
+			{Name: ap, Content: []byte(action)},
 		},
 		Comment:  message,
 		User:     user,

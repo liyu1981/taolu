@@ -1,29 +1,44 @@
 package vault
 
 import (
+	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	libfossil "github.com/danmestas/go-libfossil"
 )
 
-const practiceAuthoringSeed = `---
-name: practice-authoring
-description: How to summarize a project's conventions and save, install, upgrade, and roll back versioned skills in the agent vault.
+const taoluAuthoringSkill = `---
+name: taolu-authoring
+description: How to summarize a project's conventions into a taolu (a SKILL.md plus an ACTION.md that says what to do with it) and how to save, apply, upgrade, and roll back versioned taolus.
 license: MIT
 compatibility: opencode
 metadata:
-  tags: "vault,authoring,skill,meta"
+  tags: "taolu,authoring,skill,meta"
   source: "taolu"
 ---
 
-## What the vault is
+## What a taolu is
 
-The vault is a versioned library of skills. A **skill** is a SKILL.md document
-stored under a **practice** (a grouping folder). Each save creates a new
-immutable version labeled v1, v2, ... Skills are installed into a project as
-real skill files and can be pinned to a specific version.
+A **taolu** is a skill plus an action. It is the unit of knowledge in the
+vault: a reusable convention, saved under a **group** (a domain folder), and
+versioned in the Fossil database.
 
-## How to summarize a project into a skill
+- The **skill** is a SKILL.md document describing the convention.
+- The **action** is an ACTION.md document telling the agent what to do after
+  obtaining the skill. Skill and action are one taolu: they are saved,
+  versioned, read, and diffed together.
+
+### Action modes
+
+- **apply**: use the skill once on the current project; do not install it.
+- **install**: install the skill into the local repo as a real skill file with
+  a version pin.
+- **enforce**: install the skill and add a reference to it in the local
+  AGENTS.md so every agent follows it.
+
+## How to summarize a project into a taolu
 
 ### 1. Survey the project
 
@@ -47,11 +62,11 @@ Focus on durable, actionable conventions, not trivia:
 
 ### 3. Write the SKILL.md draft
 
-Every skill is a SKILL.md document with YAML frontmatter:
+Every taolu's skill is a SKILL.md document with YAML frontmatter:
 
     ---
     name: <skill-name>
-    description: <1-1024 chars, what the agent uses to pick this skill>
+    description: <1-1024 chars, what the agent uses to pick this taolu>
     license: MIT
     compatibility: opencode
     metadata:
@@ -61,44 +76,65 @@ Every skill is a SKILL.md document with YAML frontmatter:
     ---
 
     ## Purpose
-    When to use this skill.
+    When to use this taolu.
 
     ## Conventions
     The concrete, actionable instructions.
 
-- The name must be the skill name and match the save name.
+- The name must match the save name.
 - Keep the description specific enough that an agent can choose correctly.
-- Use concrete, actionable instructions. Prefer small, focused skills.
+- Use concrete, actionable instructions. Prefer small, focused taolus.
+
+### 4. Write the ACTION.md
+
+Choose the mode that matches how the taolu should be used:
+
+    ---
+    mode: install        # apply | install | enforce
+    detail:
+      format: opencode   # install/enforce only: opencode | claude | agents
+    ---
+
+- Choose **apply** for a one-off: read the skill, do the work, nothing saved.
+- Choose **install** to make the skill available in the project's skill store.
+- Choose **enforce** for a project-wide convention that every agent must
+  follow (installs and adds an AGENTS.md reference).
 
 ## How to save / update
 
-- vault_practice_save with the skill name, a practice group
-  (e.g. backend, frontend, workflows, meta), and the full content.
-- The server validates the name and frontmatter, commits, and labels the new
-  version (v1, v2, ...). Provide a concise message describing the change.
+- taolu_save with the name, a group (e.g. backend, frontend, workflows, meta),
+  the full SKILL.md content, and the ACTION.md content.
+- The server validates both, commits them together, and labels the new version
+  (v1, v2, ...). Provide a concise message describing the change.
 - Saving again with the same name creates a new version; nothing is lost.
 
-## How to install / upgrade / roll back
+## How to apply / upgrade / roll back
 
-- vault_practice_list to find skills; vault_practice_get to read one.
-- vault_practice_install writes .opencode/skills/<name>/SKILL.md and a
-  .vault-version pin. Install requires explicit user approval.
-- To upgrade, read the pin, check vault_practice_history and
-  vault_practice_diff, then re-install the newer version (or an older one to
-  roll back). Pins make the upgrade explicit.
+- taolu_list to find taolus; taolu_get to read one (skill + action).
+- taolu_apply dispatches on the action mode: apply returns the content for a
+  one-shot use; install/enforce write the skill and a .taolu-version pin.
+- To upgrade, read the pin, check taolu_history and taolu_diff, then apply the
+  newer version (or an older one to roll back). Pins make the upgrade explicit.
 
 ## Quality checklist
 
-A good skill is:
+A good taolu is:
 
 - Specific: it captures real conventions of a real project, not generic advice.
 - Actionable: an agent can follow it without guessing.
-- Small: one topic per skill.
+- Small: one topic per taolu.
 - Findable: a clear description and metadata tags.
 - Versioned: save improvements as new versions, never by overwriting silently.
 `
 
-// EnsureAuthoringGuide seeds the practice-authoring skill if it is missing.
+const taoluAuthoringAction = `---
+mode: apply
+---
+Apply this taolu by reading the accompanying skill and following it whenever
+you summarize a project or author, save, or apply taolus.
+`
+
+// EnsureAuthoringGuide seeds the taolu-authoring guide if it is missing.
 func EnsureAuthoringGuide(r *libfossil.Repo, user string) error {
 	path, err := FindSkillPath(r, SeedName)
 	if err != nil {
@@ -116,7 +152,8 @@ func EnsureAuthoringGuide(r *libfossil.Repo, user string) error {
 	}
 	rid, _, err := r.Commit(libfossil.CommitOpts{
 		Files: []libfossil.FileToCommit{
-			{Name: practicePath(seedGroup, SeedName), Content: []byte(practiceAuthoringSeed)},
+			{Name: skillPath(seedGroup, SeedName), Content: []byte(taoluAuthoringSkill)},
+			{Name: actionPath(seedGroup, SeedName), Content: []byte(taoluAuthoringAction)},
 		},
 		Comment:  fmt.Sprintf("seed %s (v1)", SeedName),
 		User:     user,
@@ -131,4 +168,94 @@ func EnsureAuthoringGuide(r *libfossil.Repo, user string) error {
 		User:     user,
 	})
 	return err
+}
+
+// MigrateLegacy migrates a pre-v1 vault's practices/<group>/<name>/ tree to the
+// taolus/ root, adding a default ACTION.md (mode install) to skills that lack
+// one, and tags each migrated taolu v1. It is a no-op when there is no legacy
+// tree.
+func MigrateLegacy(r *libfossil.Repo, user string) error {
+	rid, err := r.ResolveVersion("tip")
+	if errors.Is(err, libfossil.ErrVersionNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	files, err := r.ListFiles(rid)
+	if err != nil {
+		return err
+	}
+	legacyPrefix := "practices" + string(filepath.Separator)
+	var toCommit []libfossil.FileToCommit
+	dirs := map[string]bool{}
+	for _, f := range files {
+		if !strings.HasPrefix(f.Name, legacyPrefix) {
+			continue
+		}
+		base := filepath.Base(f.Name)
+		if base != "SKILL.md" && base != "ACTION.md" {
+			continue
+		}
+		data, err := r.ReadFile(rid, f.Name)
+		if err != nil {
+			return err
+		}
+		rel := strings.TrimPrefix(f.Name, "practices")
+		toCommit = append(toCommit, libfossil.FileToCommit{
+			Name:    "taolus" + rel,
+			Content: data,
+		})
+		if base == "SKILL.md" {
+			dirs[filepath.Dir(f.Name)] = true
+		}
+	}
+	if len(toCommit) == 0 {
+		return nil
+	}
+	for d := range dirs {
+		if fileExistsAt(files, filepath.Join(d, "ACTION.md")) {
+			continue
+		}
+		rel := strings.TrimPrefix(d, "practices")
+		toCommit = append(toCommit, libfossil.FileToCommit{
+			Name:    "taolus" + rel + string(filepath.Separator) + "ACTION.md",
+			Content: []byte(defaultActionInstall),
+		})
+	}
+	if user == "" {
+		user = "admin"
+	}
+	parent, err := resolveParentTip(r)
+	if err != nil {
+		return err
+	}
+	newRID, _, err := r.Commit(libfossil.CommitOpts{
+		Files:    toCommit,
+		Comment:  "migrate legacy practices/ tree to taolus/",
+		User:     user,
+		ParentID: parent,
+	})
+	if err != nil {
+		return err
+	}
+	for d := range dirs {
+		name := filepath.Base(d)
+		if !ValidSlug(name) {
+			continue
+		}
+		if _, err := r.Tag(libfossil.TagOpts{Name: name + "-v1", TargetID: newRID, User: user}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func fileExistsAt(files []libfossil.FileEntry, name string) bool {
+	for _, f := range files {
+		if f.Name == name {
+			return true
+		}
+	}
+	return false
 }

@@ -16,6 +16,16 @@ var installTargets = map[string]string{
 	"agents":   filepath.Join(".agents", "skills"),
 }
 
+// ApplyResult describes the outcome of applying a taolu.
+type ApplyResult struct {
+	Mode   string
+	Skill  string
+	Action string
+	Rel    string
+	Label  string
+	Pinned bool
+}
+
 func safeJoin(base, rel string) (string, error) {
 	if base == "" {
 		base = "."
@@ -35,23 +45,80 @@ func safeJoin(base, rel string) (string, error) {
 	return joined, nil
 }
 
-// InstallPractice materializes a skill as a SKILL.md in the target project.
-func InstallPractice(r *libfossil.Repo, repoPath, name, version, target, format string, force bool) (string, error) {
-	path, err := FindSkillPath(r, name)
+// ApplyTaolu executes a taolu at a version. It reads the taolu's ACTION.md to
+// determine the mode and dispatches:
+//
+//   - apply:   returns the content; nothing is written.
+//   - install: writes SKILL.md + a .taolu-version pin into the format target.
+//   - enforce: installs, then appends/replaces a compliance reference line in
+//     AGENTS.md so every agent loads it.
+//
+// modeOverride wins over the stored action when non-empty.
+func ApplyTaolu(r *libfossil.Repo, repoPath, name, version, target, format, modeOverride string, force bool) (*ApplyResult, error) {
+	sp, err := FindSkillPath(r, name)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if path == "" {
-		return "", fmt.Errorf("skill %q not found in vault", name)
+	if sp == "" {
+		return nil, fmt.Errorf("taolu %q not found in vault", name)
 	}
-	uuid, err := resolveSkillVersion(r, path, version)
+	uuid, err := resolveSkillVersion(r, sp, version)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	content, err := r.ReadFileAt(uuid, path)
+	label := versionLabel(r, sp, uuid)
+	skillData, err := r.ReadFileAt(uuid, sp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(sp), "ACTION.md"))
+	if err != nil {
+		return nil, fmt.Errorf("taolu %q has no ACTION.md", name)
+	}
+	am, _, err := splitActionFrontmatter(string(actionData))
+	if err != nil {
+		return nil, err
+	}
+
+	mode := am.Mode
+	if mode == "" {
+		mode = ModeInstall
+	}
+	if modeOverride != "" {
+		if !ValidActionMode(modeOverride) {
+			return nil, fmt.Errorf("invalid action %q: must be apply, install, or enforce", modeOverride)
+		}
+		mode = modeOverride
+	}
+
+	res := &ApplyResult{Mode: mode, Skill: string(skillData), Action: string(actionData), Label: label}
+	if mode == ModeApply {
+		return res, nil
+	}
+
+	if format == "" {
+		format = am.Detail["format"]
+	}
+	if format == "" {
+		format = "opencode"
+	}
+	rel, err := installSkill(r, repoPath, name, uuid, skillData, label, target, format, force)
+	if err != nil {
+		return nil, err
+	}
+	res.Rel = rel
+	res.Pinned = true
+	if mode == ModeEnforce {
+		if err := enforceAGENTS(target, name, label, filepath.Join(rel, "SKILL.md")); err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+// installSkill materializes a taolu's SKILL.md into the format target with a
+// .taolu-version pin, returning the relative installed directory.
+func installSkill(r *libfossil.Repo, repoPath, name, uuid string, content []byte, label, target, format string, force bool) (string, error) {
 	rel := installTargets[format]
 	if rel == "" {
 		return "", fmt.Errorf("unknown format %q (expected opencode, claude, or agents)", format)
@@ -71,23 +138,63 @@ func InstallPractice(r *libfossil.Repo, repoPath, name, version, target, format 
 		return "", err
 	}
 
-	pin := fmt.Sprintf("%s %s\n", repoPath, ShortUUID(uuid))
-	label := ""
-	if hist, err := SkillHistory(r, path); err == nil {
-		for _, v := range hist {
-			if v.UUID == uuid {
-				label = v.Label
-				break
-			}
-		}
+	pinVersion := label
+	if pinVersion == "" {
+		pinVersion = ShortUUID(uuid)
 	}
-	if label != "" {
-		pin = fmt.Sprintf("%s %s\n", repoPath, label)
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".vault-version"), []byte(pin), 0o644); err != nil {
+	pin := fmt.Sprintf("%s %s\n", repoPath, pinVersion)
+	if err := os.WriteFile(filepath.Join(dir, ".taolu-version"), []byte(pin), 0o644); err != nil {
 		return "", err
 	}
 	return filepath.Join(rel, name), nil
+}
+
+// enforceAGENTS appends (or updates) an idempotent compliance reference for a
+// taolu in the target project's AGENTS.md. Only the marker line and the
+// reference line that follows it are ever touched; nothing else in the file.
+func enforceAGENTS(target, name, label, relSkill string) error {
+	if label == "" {
+		label = "tip"
+	}
+	marker := fmt.Sprintf("<!-- taolu-enforce:%s -->", name)
+	refLine := fmt.Sprintf("- Follow the taolu %s (%s) in %s", name, label, relSkill)
+	p, err := safeJoin(target, "AGENTS.md")
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(p)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	var lines []string
+	if len(data) > 0 {
+		lines = strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+		if len(lines) == 1 && lines[0] == "" {
+			lines = nil
+		}
+	}
+	idx := -1
+	for i, l := range lines {
+		if strings.TrimSpace(l) == marker {
+			idx = i
+			break
+		}
+	}
+	block := []string{marker, refLine}
+	if idx >= 0 {
+		newLines := append([]string{}, lines[:idx]...)
+		newLines = append(newLines, block...)
+		if idx+2 <= len(lines) {
+			newLines = append(newLines, lines[idx+2:]...)
+		}
+		lines = newLines
+	} else {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, block...)
+	}
+	return os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
 }
 
 // ShortUUID returns the first 12 characters of a UUID.

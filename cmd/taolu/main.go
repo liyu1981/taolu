@@ -34,7 +34,7 @@ func newServer() (*mcp.Server, error) {
 		Version: serverVersion,
 	}, nil)
 
-	tools.RegisterVaultTools(server)
+	tools.RegisterTaoluTools(server)
 
 	return server, nil
 }

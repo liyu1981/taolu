@@ -1,8 +1,12 @@
 # taolu
 
-An MCP server for a **versioned practice library** ("the vault"). Agents can save skills that capture a project's conventions, then find and install them (pinned to a version) into any project.
+An MCP server for a **versioned taolu library** ("the vault"). A **taolu** is a
+skill plus an action: a `SKILL.md` that captures a project's conventions paired
+with an `ACTION.md` that tells the agent what to do with it (apply once, install,
+or install and enforce). Agents can save taolus, then find and apply them
+(pinned to a version) into any project.
 
-Fossil SCM is the underlying storage engine via [go-libfossil](https://github.com/danmestas/go-libfossil) — pure-Go, no CGo, no `fossil` binary. It is **not exposed** to agents: the entire public MCP surface is the `vault_*` tools below.
+Fossil SCM is the underlying storage engine via [go-libfossil](https://github.com/danmestas/go-libfossil) — pure-Go, no CGo, no `fossil` binary. It is **not exposed** to agents: the entire public MCP surface is the `taolu_*` tools below.
 
 ## Requirements
 
@@ -24,9 +28,10 @@ The vault defaults to `~/.taolu/vault.fossil`. Override it:
 - Per call: pass the `path` argument to any tool.
 - Globally: set `TAOLU_REPO=/path/to/vault.fossil`.
 
-Run `vault_init` once to create the vault; it also seeds the built-in
-`practice-authoring` skill under the `meta` practice, which teaches agents how
-to summarize projects and author new skills.
+Run `taolu_init` once to create the vault; it also seeds the built-in
+`taolu-authoring` guide under the `meta` group, which teaches agents how to
+summarize projects and author new taolus. Opening a pre-v1 vault migrates any
+legacy `practices/` tree to `taolus/` automatically.
 
 ## Registering with an MCP client
 
@@ -67,43 +72,63 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
 
 | Tool | Purpose | Required | Optional |
 | --- | --- | --- | --- |
-| `vault_init` | Create/open the vault and seed `practice-authoring` | — | `path`, `user` |
-| `vault_info` | Show vault path, project-code, skills, practices | — | `path` |
-| `vault_practice_save` | Save a skill as a new versioned check-in | `name`, `practice`, `content` | `version_label`, `message`, `user`, `path` |
-| `vault_practice_get` | Read a skill's content at a version | `name` | `version`, `path` |
-| `vault_practice_list` | List/filter skills | — | `query`, `tag`, `practice`, `path` |
-| `vault_practice_history` | List a skill's versions (oldest first) | `name` | `path` |
-| `vault_practice_diff` | Unified diff between two versions | `name`, `version_b` | `version_a`, `path` |
-| `vault_practice_install` | Install a skill as `SKILL.md` with a version pin | `name` | `version`, `target`, `format`, `force`, `path` |
-| `vault_practice_export` | Export raw skill content | `name` | `version`, `path` |
+| `taolu_init` | Create/open the vault, migrate legacy `practices/`, seed `taolu-authoring` | — | `path`, `user` |
+| `taolu_info` | Show vault path, project-code, taolus, groups | — | `path` |
+| `taolu_save` | Save a taolu (`SKILL.md` + `ACTION.md`) as a new versioned check-in | `name`, `group`, `skill`, `action` | `version_label`, `message`, `user`, `path` |
+| `taolu_get` | Read a taolu's `SKILL.md` + `ACTION.md` at a version | `name` | `version`, `path` |
+| `taolu_list` | List/filter taolus (shows action mode) | — | `query`, `tag`, `group`, `include`, `path` |
+| `taolu_history` | List a taolu's versions (oldest first) | `name` | `path` |
+| `taolu_diff` | Unified diff between two versions (skill + action together) | `name`, `version_b` | `version_a`, `path` |
+| `taolu_apply` | Apply a taolu per its action: apply / install / enforce | `name` | `version`, `target`, `format`, `action`, `force`, `path` |
+| `taolu_export` | Export raw taolu content | `name` | `version`, `path` |
 
 ### Details
 
-- **Skills** live at `practices/<practice>/<name>/SKILL.md` in the vault. `practice` (e.g. `backend`, `frontend`, `workflows`, `meta`) is an organizational folder; `name` is the skill slug, globally unique, and the install target name. Each skill is a directory so it can hold support files (templates, examples, assets) next to `SKILL.md` in the future.
-- **Content** is a `SKILL.md` with YAML frontmatter (`name`, `description`, optional `license`/`compatibility`/`metadata`). Names must be lowercase alphanumeric with single hyphens.
-- **Versions** are immutable. Each save is tagged `v1`, `v2`, … (or a custom `version_label`). The `version` argument accepts a label or a UUID prefix.
-- **Install** writes `.opencode/skills/<name>/SKILL.md` (or `.claude/skills` / `.agents/skills` via `format`) plus a `.vault-version` pin recording the installed version. It **always requires explicit user approval**, and refuses to overwrite without `force`.
+- **Taolus** live at `taolus/<group>/<name>/` in the vault, as `SKILL.md` plus
+  `ACTION.md`. `group` (e.g. `backend`, `frontend`, `workflows`, `meta`) is an
+  organizational folder; `name` is the taolu slug, globally unique. Skill and
+  action are **one unit**: they are saved, versioned, read, and diffed
+  together.
+- **`SKILL.md`** has YAML frontmatter (`name`, `description`, optional
+  `license`/`compatibility`/`metadata`). **`ACTION.md`** has `mode`
+  (`apply`, `install`, or `enforce`) plus optional `detail.format`
+  (`opencode` | `claude` | `agents`). Names must be lowercase alphanumeric with
+  single hyphens.
+- **Versions** are immutable. Each save is tagged `v1`, `v2`, … (or a custom
+  `version_label`). The `version` argument accepts a label or a UUID prefix.
+- **Apply** dispatches on the action: `apply` returns the content for a one-shot
+  use (nothing written); `install` writes `.opencode/skills/<name>/SKILL.md`
+  (or `.claude/skills` / `.agents/skills` via `format`) plus a `.taolu-version`
+  pin; `enforce` does the same and appends a single idempotent compliance
+  reference to the project's `AGENTS.md`. Install and enforce **always require
+  explicit user approval**, and refuse to overwrite without `force`.
 
 ## Example flow
 
 ```text
-vault_init
-vault_practice_save   name=go-api-server practice=backend content=<SKILL.md>
-vault_practice_save   name=go-api-server practice=backend content=<v2> message="add pkg/ layout"
-vault_practice_list   query=go
-vault_practice_history name=go-api-server
-vault_practice_install name=go-api-server version=v2 target=./my-new-project
+taolu_init
+taolu_save   name=go-api-server group=backend skill=<SKILL.md> action=<ACTION.md>
+taolu_save   name=go-api-server group=backend skill=<v2> action=<v2> message="add pkg/ layout"
+taolu_list   query=go
+taolu_history name=go-api-server
+taolu_apply  name=go-api-server version=v2 target=./my-new-project
 ```
 
 ## Security
 
-- Skills are **data**: agent-authored content stored verbatim and never executed server-side. Installed skills are instructions the agent explicitly chose to load.
-- `vault_practice_install` writes into the project and always prompts for approval.
+- Taolus are **data**: agent-authored content stored verbatim and never executed
+  server-side. Actions are instructions the agent explicitly chose to follow.
+- `taolu_apply` in `install`/`enforce` modes writes into the project and always
+  prompts for approval; `AGENTS.md` is never touched beyond the single
+  reference line.
 
 ## Development
 
 - `go build ./...` and `go vet ./...` must pass.
-- End-to-end behavior is verified with scripted JSON-RPC clients speaking the stdio protocol (initialize → tools/list → tools/call) covering init, save, list, get, history, diff, install (all formats + pins), export, and error paths.
+- End-to-end behavior is verified with scripted JSON-RPC clients speaking the
+  stdio protocol (initialize → tools/list → tools/call) covering init,
+  migration, save, list, get, history, diff, apply (all three modes + pins +
+  AGENTS.md idempotency), export, and error paths.
 
 Note: `go mod tidy` cannot fully complete because an upstream dependency of go-libfossil references an invalid pseudo-version (`github.com/ncruces/go-sqlite3-wasm`). `go mod tidy -e` updates the module file correctly, and the build is unaffected.
 
