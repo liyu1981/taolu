@@ -13,7 +13,7 @@ license: MIT
 compatibility: opencode
 metadata:
   tags: "vault,authoring,skill,meta"
-  source: "agent-vault"
+  source: "taolu"
 ---
 
 ## What the vault is

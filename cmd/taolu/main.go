@@ -1,4 +1,4 @@
-// Command agent-vault runs the versioned practice library as an MCP server.
+// Command taolu runs the versioned practice library as an MCP server.
 package main
 
 import (
@@ -8,11 +8,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yli/agent-vault/pkg/tools"
+	"github.com/yli/taolu/pkg/tools"
 )
 
 const (
-	serverName    = "agent-vault"
+	serverName    = "taolu"
 	serverVersion = "0.1.0"
 )
 

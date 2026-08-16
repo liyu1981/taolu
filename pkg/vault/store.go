@@ -43,20 +43,20 @@ func OpenVault(path string) (*libfossil.Repo, string, error) {
 	return r, p, nil
 }
 
-// VaultPath resolves the requested path, falling back to AGENT_VAULT_REPO and
-// then to ~/.agent-vault/vault.fossil.
+// VaultPath resolves the requested path, falling back to TAOLU_REPO and
+// then to ~/.taolu/vault.fossil.
 func VaultPath(arg string) (string, error) {
 	if arg != "" {
 		return filepath.Clean(arg), nil
 	}
-	if env := os.Getenv("AGENT_VAULT_REPO"); env != "" {
+	if env := os.Getenv("TAOLU_REPO"); env != "" {
 		return filepath.Clean(env), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".agent-vault", "vault.fossil"), nil
+	return filepath.Join(home, ".taolu", "vault.fossil"), nil
 }
 
 // FindSkillPath returns the vault path of the skill's SKILL.md, or "" if not present.

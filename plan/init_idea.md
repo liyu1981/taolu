@@ -1,4 +1,4 @@
-# Agent Vault — Versioned Practice Library MCP Server
+# Taolu — Versioned Practice Library MCP Server
 
 ## 1. The idea (original)
 
@@ -10,7 +10,7 @@ Create an MCP server for agents able to:
 **Use cases**
 
 - **Case 1 (push):** a project has a specific tech stack. From the project we ask to summarize the architecture conventions with a proper name (in skill format).
-- **Case 2 (pull):** when starting a new project we ask the agent to query our past agent-vault for practices, so it installs local skills with the ability to specify versions.
+- **Case 2 (pull):** when starting a new project we ask the agent to query our past taolu vault for practices, so it installs local skills with the ability to specify versions.
 
 ---
 
@@ -35,7 +35,7 @@ Division of labor:
 
 | Concept | Definition |
 | --- | --- |
-| **Vault** | A Fossil repository (`.fossil` file) that stores skills. Default `~/.agent-vault/vault.fossil`; overridable per call. |
+| **Vault** | A Fossil repository (`.fossil` file) that stores skills. Default `~/.taolu/vault.fossil`; overridable per call. |
 | **Practice** | A **required** grouping/domain folder in the vault (e.g. `backend`, `frontend`, `workflows`, `meta`). Organizational only — never appears in installed skill names. |
 | **Skill** | A named, versioned skill document: markdown with YAML frontmatter, shaped like a `SKILL.md`. Lives at `practices/<practice>/<name>/SKILL.md`. |
 | **Name (slug)** | The unique id of a skill = the skill name. Globally unique in the vault. Also the install target name. Must be a valid skill slug. |
@@ -211,7 +211,7 @@ Lookup tools (`get`/`history`/`diff`/`install`/`export`) are keyed by `name` onl
   - `vaultseed.go` — the embedded `practice-authoring` markdown + seed logic used by `vault_init`.
   - `server.go` — registers only vault tools (drop `registerTools` and `registerFossilTools`).
 - Config:
-  - Default vault path `~/.agent-vault/vault.fossil`; overridable via env `AGENT_VAULT_REPO` or per-call `path`.
+  - Default vault path `~/.taolu/vault.fossil`; overridable via env `TAOLU_REPO` or per-call `path`.
   - `user` defaults to `admin`.
 - Removal of `tools.go` (demo tools) and `fossil.go` (fossil tools) from the public surface; migrate reusable helpers into the new files.
 
@@ -240,7 +240,7 @@ Lookup tools (`get`/`history`/`diff`/`install`/`export`) are keyed by `name` onl
 
 ## 11. Decisions (resolved)
 
-1. **Vault location** — global `~/.agent-vault/vault.fossil`, overridable per call / `AGENT_VAULT_REPO`. ✅
+1. **Vault location** — global `~/.taolu/vault.fossil`, overridable per call / `TAOLU_REPO`. ✅
 2. **Grouping model** — the required grouping is called **practice** (`practices/<practice>/<name>/SKILL.md`, a directory per skill for future support files); the document's **name** is the skill name. Skill names are globally unique; lookups are keyed by name only. ✅
 3. **Authoring guide placement** — seeded under the `meta` practice group. ✅
 4. **Install approval** — `vault_practice_install` always asks for explicit user approval. ✅

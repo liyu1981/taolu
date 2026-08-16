@@ -1,4 +1,4 @@
-module github.com/yli/agent-vault
+module github.com/yli/taolu
 
 go 1.26.0
 

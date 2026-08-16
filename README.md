@@ -1,4 +1,4 @@
-# agent-vault
+# taolu
 
 An MCP server for a **versioned practice library** ("the vault"). Agents can save skills that capture a project's conventions, then find and install them (pinned to a version) into any project.
 
@@ -12,17 +12,17 @@ Fossil SCM is the underlying storage engine via [go-libfossil](https://github.co
 ## Build
 
 ```sh
-go build -o agent-vault ./cmd/agent-vault
+go build -o taolu ./cmd/taolu
 ```
 
 The binary is an MCP server that speaks newline-delimited JSON-RPC over stdio.
 
 ## Configuration
 
-The vault defaults to `~/.agent-vault/vault.fossil`. Override it:
+The vault defaults to `~/.taolu/vault.fossil`. Override it:
 
 - Per call: pass the `path` argument to any tool.
-- Globally: set `AGENT_VAULT_REPO=/path/to/vault.fossil`.
+- Globally: set `TAOLU_REPO=/path/to/vault.fossil`.
 
 Run `vault_init` once to create the vault; it also seeds the built-in
 `practice-authoring` skill under the `meta` practice, which teaches agents how
@@ -35,11 +35,11 @@ to summarize projects and author new skills.
 ```json
 {
   "mcp": {
-    "agent-vault": {
+    "taolu": {
       "type": "local",
-      "command": ["go", "run", "./cmd/agent-vault"],
+      "command": ["go", "run", "./cmd/taolu"],
       "environment": {
-        "AGENT_VAULT_REPO": "/home/you/.agent-vault/vault.fossil"
+        "TAOLU_REPO": "/home/you/.taolu/vault.fossil"
       }
     }
   }
@@ -51,19 +51,19 @@ to summarize projects and author new skills.
 ```json
 {
   "mcpServers": {
-    "agent-vault": {
+    "taolu": {
       "command": "go",
-      "args": ["run", "./cmd/agent-vault"]
+      "args": ["run", "./cmd/taolu"]
     }
   }
 }
 ```
 
-To avoid recompiling on every launch, build the binary once and point `command` at `./agent-vault`.
+To avoid recompiling on every launch, build the binary once and point `command` at `./taolu`.
 
 ## Tools
 
-All tools take an optional `path` (vault repo; defaults to `AGENT_VAULT_REPO` or `~/.agent-vault/vault.fossil`).
+All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.taolu/vault.fossil`).
 
 | Tool | Purpose | Required | Optional |
 | --- | --- | --- | --- |

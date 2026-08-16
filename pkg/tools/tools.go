@@ -12,7 +12,7 @@ import (
 	libfossil "github.com/danmestas/go-libfossil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yli/agent-vault/pkg/vault"
+	"github.com/yli/taolu/pkg/vault"
 )
 
 // RegisterVaultTools registers the vault_* MCP tools on the server.
@@ -21,7 +21,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		Name:        "vault_init",
 		Description: "Create or open the practice vault (a Fossil repository) and ensure the practice-authoring guide is seeded. Returns vault path, project-code, and skill count.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 		User string `json:"user,omitempty" jsonschema:"user recorded for seeded commits; defaults to admin"`
 	}) (*mcp.CallToolResult, any, error) {
 		p, err := vault.VaultPath(args.Path)
@@ -59,7 +59,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		Name:        "vault_info",
 		Description: "Show information about the practice vault: path, project-code, skill count, practice groups, and the latest practice-authoring version.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		r, p, err := vault.OpenVault(args.Path)
 		if err != nil {
@@ -102,7 +102,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		VersionLabel string `json:"version_label,omitempty" jsonschema:"explicit version label; defaults to the next vN for this skill"`
 		Message      string `json:"message,omitempty" jsonschema:"commit message describing the change"`
 		User         string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
-		Path         string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path         string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" || args.Practice == "" || args.Content == "" {
 			return nil, nil, errors.New("name, practice, and content are required")
@@ -132,7 +132,7 @@ func RegisterVaultTools(server *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Name    string `json:"name" jsonschema:"skill name (required)"`
 		Version string `json:"version,omitempty" jsonschema:"version to read (vN label or UUID prefix); defaults to latest"`
-		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
@@ -156,7 +156,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		Query    string `json:"query,omitempty" jsonschema:"case-insensitive substring match against name, description, and tags"`
 		Tag      string `json:"tag,omitempty" jsonschema:"require this tag in the skill's metadata tags (comma-separated match)"`
 		Practice string `json:"practice,omitempty" jsonschema:"only list skills under this practice group"`
-		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		r, _, err := vault.OpenVault(args.Path)
 		if err != nil {
@@ -215,7 +215,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		Description: "List all versions of a skill, oldest first, with label, UUID, date, user, and message.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Name string `json:"name" jsonschema:"skill name (required)"`
-		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
@@ -254,7 +254,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		Name     string `json:"name" jsonschema:"skill name (required)"`
 		VersionB string `json:"version_b" jsonschema:"newer version (vN label or UUID prefix) (required)"`
 		VersionA string `json:"version_a,omitempty" jsonschema:"older version; defaults to the version before version_b"`
-		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" || args.VersionB == "" {
 			return nil, nil, errors.New("name and version_b are required")
@@ -306,7 +306,7 @@ func RegisterVaultTools(server *mcp.Server) {
 		Target  string `json:"target,omitempty" jsonschema:"project root directory; defaults to the current directory"`
 		Format  string `json:"format,omitempty" jsonschema:"skill format: opencode, claude, or agents; defaults to opencode"`
 		Force   bool   `json:"force,omitempty" jsonschema:"overwrite an existing SKILL.md"`
-		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
@@ -333,7 +333,7 @@ func RegisterVaultTools(server *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Name    string `json:"name" jsonschema:"skill name (required)"`
 		Version string `json:"version,omitempty" jsonschema:"version to export (vN label or UUID prefix); defaults to latest"`
-		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to AGENT_VAULT_REPO or ~/.agent-vault/vault.fossil"`
+		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
 		if args.Name == "" {
 			return nil, nil, errors.New("name is required")
