@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -89,8 +90,13 @@ func runHTTP() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
-	if err := httpServer.Shutdown(context.Background()); err != nil {
-		log.Printf("shutdown: %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("graceful shutdown: %v; closing", err)
+		if cerr := httpServer.Close(); cerr != nil {
+			log.Printf("close: %v", cerr)
+		}
 	}
 }
 
