@@ -105,6 +105,17 @@ func RegisterTaoluTools(server *mcp.Server) {
 			return nil, nil, err
 		}
 		defer r.Close()
+		if sp, err := vault.FindSkillPath(r, args.Name); err != nil {
+			return nil, nil, err
+		} else if sp != "" {
+			archived, err := vault.IsArchived(r, sp)
+			if err != nil {
+				return nil, nil, err
+			}
+			if archived {
+				return nil, nil, fmt.Errorf("taolu %q is archived; restore it before saving a new version", args.Name)
+			}
+		}
 		label, uuid, total, err := vault.SaveTaolu(r, args.Group, args.Name, args.Skill, args.Action, args.Message, args.User, args.VersionLabel)
 		if err != nil {
 			return nil, nil, err
@@ -133,7 +144,18 @@ func RegisterTaoluTools(server *mcp.Server) {
 		if err != nil {
 			return nil, nil, err
 		}
-		return textResult(fmt.Sprintf("## SKILL.md\n\n%s\n\n## ACTION.md\n\n%s", skill, action)), nil, nil
+		var b strings.Builder
+		sp, err := vault.FindSkillPath(r, args.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		if archived, err := vault.IsArchived(r, sp); err != nil {
+			return nil, nil, err
+		} else if archived {
+			fmt.Fprintf(&b, "## ARCHIVED — do not use this taolu\n\n")
+		}
+		fmt.Fprintf(&b, "## SKILL.md\n\n%s\n\n## ACTION.md\n\n%s", skill, action)
+		return textResult(b.String()), nil, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -322,6 +344,17 @@ func RegisterTaoluTools(server *mcp.Server) {
 			return nil, nil, err
 		}
 		defer r.Close()
+		if sp, err := vault.FindSkillPath(r, args.Name); err != nil {
+			return nil, nil, err
+		} else if sp != "" {
+			archived, err := vault.IsArchived(r, sp)
+			if err != nil {
+				return nil, nil, err
+			}
+			if archived {
+				return nil, nil, fmt.Errorf("taolu %q is archived and must not be used; restore it first", args.Name)
+			}
+		}
 		res, err := vault.ApplyTaolu(r, p, args.Name, args.Version, args.Target, args.Format, args.Action, args.Force)
 		if err != nil {
 			return nil, nil, err
@@ -359,6 +392,154 @@ func RegisterTaoluTools(server *mcp.Server) {
 		if err != nil {
 			return nil, nil, err
 		}
-		return textResult(fmt.Sprintf("== SKILL.md ==\n%s\n== ACTION.md ==\n%s", skill, action)), nil, nil
+		var b strings.Builder
+		sp, err := vault.FindSkillPath(r, args.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		if archived, err := vault.IsArchived(r, sp); err != nil {
+			return nil, nil, err
+		} else if archived {
+			fmt.Fprintf(&b, "# ARCHIVED — do not use this taolu\n\n")
+		}
+		fmt.Fprintf(&b, "== SKILL.md ==\n%s\n== ACTION.md ==\n%s", skill, action)
+		return textResult(b.String()), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_delete",
+		Description: "Archive a taolu: commits an .archived marker into its directory, hiding it from taolu_list and refusing taolu_apply/taolu_save until it is restored. The source tree is kept; use taolu_restore to bring it back, or taolu_list_archived to see archived taolus. Refuses the built-in taolu-authoring guide.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Name    string `json:"name" jsonschema:"taolu name to archive (required)"`
+		Message string `json:"message,omitempty" jsonschema:"commit message; defaults to 'archive taolu <name>'"`
+		User    string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
+		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Name == "" {
+			return nil, nil, errors.New("name is required")
+		}
+		r, p, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		group, err := vault.ArchiveTaolu(r, args.Name, args.Message, args.User)
+		if err != nil {
+			return nil, nil, err
+		}
+		return textResult(fmt.Sprintf("archived %s/%s\nsource tree kept; restore with taolu_restore\nvault: %s",
+			group, args.Name, p)), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_restore",
+		Description: "Restore an archived taolu: removes its .archived marker so it shows up in taolu_list again and can be used by taolu_apply and taolu_save.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Name    string `json:"name" jsonschema:"archived taolu name to restore (required)"`
+		Message string `json:"message,omitempty" jsonschema:"commit message; defaults to 'restore taolu <name>'"`
+		User    string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
+		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Name == "" {
+			return nil, nil, errors.New("name is required")
+		}
+		r, p, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		group, err := vault.RestoreTaolu(r, args.Name, args.Message, args.User)
+		if err != nil {
+			return nil, nil, err
+		}
+		return textResult(fmt.Sprintf("restored %s/%s\nvault: %s", group, args.Name, p)), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_list_archived",
+		Description: "List archived taolus, optionally filtered by query, tag, or group. These are hidden from taolu_list and must not be used until restored.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Query string `json:"query,omitempty" jsonschema:"case-insensitive substring match against name, description, and tags"`
+		Tag   string `json:"tag,omitempty" jsonschema:"require this tag in the taolu's metadata tags (comma-separated match)"`
+		Group string `json:"group,omitempty" jsonschema:"only list taolus under this group"`
+		Path  string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		r, _, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		taolus, err := vault.ListArchivedTaolu(r)
+		if err != nil {
+			return nil, nil, err
+		}
+		q := strings.ToLower(args.Query)
+		var matches []vault.TaoluInfo
+		for _, t := range taolus {
+			if args.Group != "" && t.Group != args.Group {
+				continue
+			}
+			if args.Tag != "" {
+				found := false
+				for _, tag := range strings.Split(t.Tags, ",") {
+					if strings.TrimSpace(tag) == args.Tag {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			}
+			if q != "" {
+				haystack := strings.ToLower(t.Name + " " + t.Description + " " + t.Tags)
+				if !strings.Contains(haystack, q) {
+					continue
+				}
+			}
+			matches = append(matches, t)
+		}
+		sort.Slice(matches, func(i, j int) bool {
+			if matches[i].Group == matches[j].Group {
+				return matches[i].Name < matches[j].Name
+			}
+			return matches[i].Group < matches[j].Group
+		})
+		if len(matches) == 0 {
+			return textResult("no archived taolus match"), nil, nil
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "%d archived taolu(s) (restore with taolu_restore):\n", len(matches))
+		for _, t := range matches {
+			fmt.Fprintf(&b, "  %s/%s  %s  %s  %s\n", t.Group, t.Name, t.LatestVersion, t.Mode, t.Description)
+		}
+		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_rename",
+		Description: "Rename a taolu, optionally moving it to another group: rewrites the SKILL.md frontmatter name, moves SKILL.md, ACTION.md, and support files to the new path, and records an origin marker so version history continues under the new name instead of restarting at v1. Old history is preserved.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Name     string `json:"name" jsonschema:"current taolu name (required)"`
+		NewName  string `json:"new_name" jsonschema:"new taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`
+		NewGroup string `json:"new_group,omitempty" jsonschema:"new group folder; defaults to the current group"`
+		Message  string `json:"message,omitempty" jsonschema:"commit message; defaults to 'rename taolu <name> to <new_name>'"`
+		User     string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
+		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Name == "" || args.NewName == "" {
+			return nil, nil, errors.New("name and new_name are required")
+		}
+		r, p, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		oldGroup, newGroup, err := vault.RenameTaolu(r, args.Name, args.NewName, args.NewGroup, args.Message, args.User)
+		if err != nil {
+			return nil, nil, err
+		}
+		return textResult(fmt.Sprintf("renamed %s/%s -> %s/%s\nSKILL.md frontmatter name updated\nversion history continued\nvault: %s",
+			oldGroup, args.Name, newGroup, args.NewName, p)), nil, nil
 	})
 }

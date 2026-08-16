@@ -17,6 +17,14 @@ const (
 	// SeedName is the built-in taolu-authoring guide.
 	SeedName  = "taolu-authoring"
 	seedGroup = "meta"
+
+	// archivedMarker is a marker file committed in a taolu directory that
+	// flags the taolu as archived. Archived taolus are hidden from normal
+	// listings and refused by consuming tools until restored.
+	archivedMarker = ".archived"
+	// originMarker records the previous directory path (under taolus/) of a
+	// renamed taolu, so version history continues across renames.
+	originMarker = "origin"
 )
 
 // Taolu action modes.

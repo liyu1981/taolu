@@ -62,16 +62,16 @@ func ApplyTaolu(r *libfossil.Repo, repoPath, name, version, target, format, mode
 	if sp == "" {
 		return nil, fmt.Errorf("taolu %q not found in vault", name)
 	}
-	uuid, err := resolveSkillVersion(r, sp, version)
+	uuid, vpath, err := resolveSkillVersion(r, sp, version)
 	if err != nil {
 		return nil, err
 	}
 	label := versionLabel(r, sp, uuid)
-	skillData, err := r.ReadFileAt(uuid, sp)
+	skillData, err := r.ReadFileAt(uuid, vpath)
 	if err != nil {
 		return nil, err
 	}
-	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(sp), "ACTION.md"))
+	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(vpath), "ACTION.md"))
 	if err != nil {
 		return nil, fmt.Errorf("taolu %q has no ACTION.md", name)
 	}

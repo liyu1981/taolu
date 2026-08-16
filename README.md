@@ -109,12 +109,16 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
 | `taolu_init` | Create/open the vault, migrate legacy `practices/`, seed `taolu-authoring` | — | `path`, `user` |
 | `taolu_info` | Show vault path, project-code, taolus, groups | — | `path` |
 | `taolu_save` | Save a taolu (`SKILL.md` + `ACTION.md`) as a new versioned check-in | `name`, `group`, `skill`, `action` | `version_label`, `message`, `user`, `path` |
-| `taolu_get` | Read a taolu's `SKILL.md` + `ACTION.md` at a version | `name` | `version`, `path` |
-| `taolu_list` | List/filter taolus (shows action mode) | — | `query`, `tag`, `group`, `include`, `path` |
-| `taolu_history` | List a taolu's versions (oldest first) | `name` | `path` |
+| `taolu_get` | Read a taolu's `SKILL.md` + `ACTION.md` at a version; warns when the taolu is archived | `name` | `version`, `path` |
+| `taolu_list` | List/filter active taolus (shows action mode); archived taolus are hidden | — | `query`, `tag`, `group`, `include`, `path` |
+| `taolu_list_archived` | List/filter archived taolus, which are hidden from `taolu_list` and must not be used until restored | — | `query`, `tag`, `group`, `path` |
+| `taolu_history` | List a taolu's versions (oldest first, continues across renames) | `name` | `path` |
 | `taolu_diff` | Unified diff between two versions (skill + action together) | `name`, `version_b` | `version_a`, `path` |
-| `taolu_apply` | Apply a taolu per its action: apply / install / enforce | `name` | `version`, `target`, `format`, `action`, `force`, `path` |
-| `taolu_export` | Export raw taolu content | `name` | `version`, `path` |
+| `taolu_apply` | Apply a taolu per its action: apply / install / enforce; refuses archived taolus | `name` | `version`, `target`, `format`, `action`, `force`, `path` |
+| `taolu_export` | Export raw taolu content; warns when archived | `name` | `version`, `path` |
+| `taolu_rename` | Rename a taolu (optionally into another group); rewrites the SKILL.md name and continues versioning at the next vN | `name`, `new_name` | `new_group`, `message`, `user`, `path` |
+| `taolu_delete` | Archive a taolu (commits an `.archived` marker); source tree is kept, reversible via `taolu_restore` | `name` | `message`, `user`, `path` |
+| `taolu_restore` | Restore an archived taolu back into normal listings and use | `name` | `message`, `user`, `path` |
 
 ### Details
 
@@ -130,6 +134,16 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
   single hyphens.
 - **Versions** are immutable. Each save is tagged `v1`, `v2`, … (or a custom
   `version_label`). The `version` argument accepts a label or a UUID prefix.
+- **Rename** moves `SKILL.md`, `ACTION.md`, and support files to the new path
+  (optionally another group), rewrites the frontmatter `name`, and writes an
+  `origin` marker so version history **continues** under the new name instead
+  of restarting at `v1`. Older versions stay readable through the new name.
+- **Archive** (`taolu_delete`) is not a source-tree delete: Fossil is an SCM, so
+  nothing is ever erased. It commits an `.archived` marker into the taolu's
+  directory, which hides the taolu from `taolu_list`, makes `taolu_get`/
+  `taolu_export` warn, and makes `taolu_save`/`taolu_apply` refuse. Use
+  `taolu_list_archived` to see archived taolus and `taolu_restore` to bring one
+  back. The built-in `taolu-authoring` guide can be neither archived nor renamed.
 - **Apply** dispatches on the action: `apply` returns the content for a one-shot
   use (nothing written); `install` writes `.opencode/skills/<name>/SKILL.md`
   (or `.claude/skills` / `.agents/skills` via `format`) plus a `.taolu-version`
