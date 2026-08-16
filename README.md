@@ -19,7 +19,22 @@ Fossil SCM is the underlying storage engine via [go-libfossil](https://github.co
 go build -o taolu ./cmd/taolu
 ```
 
-The binary is an MCP server that speaks newline-delimited JSON-RPC over stdio.
+## Running
+
+By default the binary runs as a **shared HTTP MCP server** (Streamable HTTP),
+so multiple opencode instances connect to one process — the vault is touched by
+a single process and there is no SQLite lock contention.
+
+```sh
+./taolu                     # listens on http://127.0.0.1:8264
+./taolu --stdio             # instead: single-process stdio mode
+```
+
+On startup the server **creates and seeds the default vault if it does not
+exist** (creating `~/.taolu/vault.fossil`, seeding the `taolu-authoring` guide,
+and migrating any legacy `practices/` tree), so it is usable immediately. The
+`taolu_init` tool is only needed to initialize or re-inspect a non-default vault
+path.
 
 ## Configuration
 
@@ -28,21 +43,40 @@ The vault defaults to `~/.taolu/vault.fossil`. Override it:
 - Per call: pass the `path` argument to any tool.
 - Globally: set `TAOLU_REPO=/path/to/vault.fossil`.
 
-Run `taolu_init` once to create the vault; it also seeds the built-in
-`taolu-authoring` guide under the `meta` group, which teaches agents how to
-summarize projects and author new taolus. Opening a pre-v1 vault migrates any
+Server binding:
+
+- `TAOLU_HOST` (default `127.0.0.1`) and `TAOLU_PORT` (default `8264`)
+  configure the HTTP listen address.
+
+Run `taolu_init` only for a non-default vault path. Opening a pre-v1 vault migrates any
 legacy `practices/` tree to `taolus/` automatically.
 
 ## Registering with an MCP client
 
-### opencode (`opencode.json`)
+### opencode — shared HTTP server (recommended, multi-instance safe)
+
+Start the server once, then point every opencode instance at it:
+
+```json
+{
+  "mcp": {
+    "taolu": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8264",
+      "enabled": true
+    }
+  }
+}
+```
+
+### opencode — local stdio (single instance)
 
 ```json
 {
   "mcp": {
     "taolu": {
       "type": "local",
-      "command": ["go", "run", "./cmd/taolu"],
+      "command": ["go", "run", "./cmd/taolu", "--stdio"],
       "environment": {
         "TAOLU_REPO": "/home/you/.taolu/vault.fossil"
       }
@@ -58,7 +92,7 @@ legacy `practices/` tree to `taolus/` automatically.
   "mcpServers": {
     "taolu": {
       "command": "go",
-      "args": ["run", "./cmd/taolu"]
+      "args": ["run", "./cmd/taolu", "--stdio"]
     }
   }
 }
@@ -125,10 +159,11 @@ taolu_apply  name=go-api-server version=v2 target=./my-new-project
 ## Development
 
 - `go build ./...` and `go vet ./...` must pass.
-- End-to-end behavior is verified with scripted JSON-RPC clients speaking the
-  stdio protocol (initialize → tools/list → tools/call) covering init,
-  migration, save, list, get, history, diff, apply (all three modes + pins +
-  AGENTS.md idempotency), export, and error paths.
+- End-to-end behavior is verified with scripted JSON-RPC clients: over HTTP
+  (initialize → tools/list → tools/call against the Streamable HTTP endpoint)
+  and over stdio, covering init, migration, save, list, get, history, diff,
+  apply (all three modes + pins + AGENTS.md idempotency), export, and error
+  paths.
 
 Note: `go mod tidy` cannot fully complete because an upstream dependency of go-libfossil references an invalid pseudo-version (`github.com/ncruces/go-sqlite3-wasm`). `go mod tidy -e` updates the module file correctly, and the build is unaffected.
 

@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	libfossil "github.com/danmestas/go-libfossil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/yli/taolu/pkg/vault"
@@ -24,29 +22,11 @@ func RegisterTaoluTools(server *mcp.Server) {
 		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 		User string `json:"user,omitempty" jsonschema:"user recorded for seeded commits; defaults to admin"`
 	}) (*mcp.CallToolResult, any, error) {
-		p, err := vault.VaultPath(args.Path)
-		if err != nil {
-			return nil, nil, err
-		}
-		var r *libfossil.Repo
-		if _, statErr := os.Stat(p); statErr == nil {
-			r, err = libfossil.Open(p)
-		} else {
-			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-				return nil, nil, err
-			}
-			r, err = libfossil.Create(p, libfossil.CreateOpts{User: args.User})
-		}
+		r, p, err := vault.EnsureVault(args.Path, args.User)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer r.Close()
-		if err := vault.EnsureAuthoringGuide(r, args.User); err != nil {
-			return nil, nil, err
-		}
-		if err := vault.MigrateLegacy(r, args.User); err != nil {
-			return nil, nil, err
-		}
 		projectCode, err := r.Config("project-code")
 		if err != nil {
 			return nil, nil, err

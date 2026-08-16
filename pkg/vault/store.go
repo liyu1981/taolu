@@ -45,6 +45,38 @@ func OpenVault(path string) (*libfossil.Repo, string, error) {
 	return r, p, nil
 }
 
+// EnsureVault opens the vault at path (or the default), creating and seeding it
+// if missing. It is idempotent: opening an existing vault only re-seeds the
+// authoring guide if absent and migrates any legacy practices/ tree. The caller
+// must Close the returned repo.
+func EnsureVault(path, user string) (*libfossil.Repo, string, error) {
+	p, err := VaultPath(path)
+	if err != nil {
+		return nil, "", err
+	}
+	var r *libfossil.Repo
+	if _, statErr := os.Stat(p); statErr == nil {
+		r, err = libfossil.Open(p)
+	} else {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return nil, "", err
+		}
+		r, err = libfossil.Create(p, libfossil.CreateOpts{User: user})
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if err := EnsureAuthoringGuide(r, user); err != nil {
+		r.Close()
+		return nil, "", err
+	}
+	if err := MigrateLegacy(r, user); err != nil {
+		r.Close()
+		return nil, "", err
+	}
+	return r, p, nil
+}
+
 // VaultPath resolves the requested path, falling back to TAOLU_REPO and
 // then to ~/.taolu/vault.fossil.
 func VaultPath(arg string) (string, error) {
