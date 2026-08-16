@@ -18,6 +18,7 @@ import (
 
 	"github.com/yli/taolu/pkg/tools"
 	"github.com/yli/taolu/pkg/vault"
+	"github.com/yli/taolu/pkg/web"
 )
 
 const (
@@ -87,6 +88,8 @@ func runHTTP() {
 		}
 	}()
 
+	stopWeb := runWebServer()
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
@@ -98,6 +101,66 @@ func runHTTP() {
 			log.Printf("close: %v", cerr)
 		}
 	}
+	if stopWeb != nil {
+		stopWeb()
+	}
+}
+
+// runWebServer starts the browser UI on the MCP port + 1. It is disabled when
+// TAOLU_WEB_PORT is "0". It returns a stop function, or nil if not started.
+func runWebServer() func() {
+	host := os.Getenv("TAOLU_HOST")
+	if host == "" {
+		host = defaultHost
+	}
+	port := webPort()
+	if port == 0 {
+		log.Printf("web UI disabled (TAOLU_WEB_PORT=0)")
+		return nil
+	}
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	webServer := &http.Server{
+		Addr:    addr,
+		Handler: web.NewHandler(""),
+	}
+	go func() {
+		if err := webServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("web server failed: %v", err)
+		}
+	}()
+	log.Printf("web UI listening on http://%s", webServer.Addr)
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := webServer.Shutdown(ctx); err != nil {
+			_ = webServer.Close()
+		}
+	}
+}
+
+// webPort returns the web UI port: TAOLU_WEB_PORT if set (0 disables), else the
+// MCP port + 1.
+func webPort() int {
+	if p := os.Getenv("TAOLU_WEB_PORT"); p != "" {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 || n > 65535 {
+			log.Printf("invalid TAOLU_WEB_PORT %q, using default", p)
+		} else {
+			return n
+		}
+	}
+	return portFromEnv() + 1
+}
+
+// portFromEnv resolves the MCP port from TAOLU_PORT (or the default).
+func portFromEnv() int {
+	port := defaultPort
+	if p := os.Getenv("TAOLU_PORT"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 && n <= 65535 {
+			port = n
+		}
+	}
+	return port
 }
 
 // listenAddr resolves the bind address from TAOLU_HOST and TAOLU_PORT.
@@ -107,15 +170,7 @@ func listenAddr() string {
 	if host == "" {
 		host = defaultHost
 	}
-	port := defaultPort
-	if p := os.Getenv("TAOLU_PORT"); p != "" {
-		if n, err := strconv.Atoi(p); err == nil && n > 0 && n <= 65535 {
-			port = n
-		} else {
-			log.Printf("invalid TAOLU_PORT %q, using default %d", p, defaultPort)
-		}
-	}
-	return net.JoinHostPort(host, strconv.Itoa(port))
+	return net.JoinHostPort(host, strconv.Itoa(portFromEnv()))
 }
 
 func newServer() (*mcp.Server, error) {

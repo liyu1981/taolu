@@ -43,8 +43,21 @@ rotate() {
 
 build() {
   mkdir -p "$VAR"
+  web_build
   echo "building -> $BIN"
   go build -o "$BIN" ./cmd/taolu
+}
+
+# web_build produces the embedded frontend bundle (pnpm). Required before go
+# build, which embeds pkg/web/dist via //go:embed.
+web_build() {
+  if [[ -d web/node_modules ]]; then
+    echo "building web assets -> pkg/web/dist"
+    (cd web && pnpm build)
+  else
+    echo "web dependencies not installed; run 'cd web && pnpm install' first" >&2
+    echo "(building Go binary without embedded UI)" >&2
+  fi
 }
 
 start() {
@@ -98,5 +111,6 @@ case "$CMD" in
   status)  status ;;
   logs)    tail -f "$LOG" ;;
   build)   build ;;
-  *)       echo "usage: $0 {start|stop|restart|status|logs|build}"; exit 2 ;;
+  web)     web_build ;;
+  *)       echo "usage: $0 {start|stop|restart|status|logs|build|web}"; exit 2 ;;
 esac
