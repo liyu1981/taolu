@@ -18,6 +18,17 @@ const (
 	SeedName  = "taolu-authoring"
 	seedGroup = "meta"
 
+	// taoluFilesDir is the reserved subdirectory holding a taolu's support
+	// files (snippets, templates, complete components). Every asset lives
+	// under it; nothing else may sit in the taolu directory.
+	taoluFilesDir = "files"
+
+	// maxAssetBytes caps a single support file, and maxAssetTotalBytes caps the
+	// whole files/ bundle of one version, so taolu_get/export/save stay usable
+	// over MCP text frames.
+	maxAssetBytes      = 1 << 20
+	maxAssetTotalBytes = 8 << 20
+
 	// archivedMarker is a marker file committed in a taolu directory that
 	// flags the taolu as archived. Archived taolus are hidden from normal
 	// listings and refused by consuming tools until restored.
@@ -65,6 +76,13 @@ type practiceMeta struct {
 type actionMeta struct {
 	Mode   string            `yaml:"mode"`
 	Detail map[string]string `yaml:"detail"`
+}
+
+// Asset is one support file in a taolu's files/ bundle. Path is relative to
+// the files/ directory (e.g. "Button.tsx", "components/Button.tsx").
+type Asset struct {
+	Path    string
+	Content string
 }
 
 // ValidActionMode reports whether m is a supported taolu action mode.
@@ -159,6 +177,66 @@ func actionPath(group, name string) string {
 	return filepath.Join(taoluRoot, group, name, "ACTION.md")
 }
 
+// assetPath returns the vault path of an asset relative to the files/
+// directory of a taolu.
+func assetPath(group, name, rel string) string {
+	return filepath.Join(taoluRoot, group, name, taoluFilesDir, filepath.Clean(rel))
+}
+
+// reservedAssetNames are paths that cannot be used as assets because they
+// collide with the taolu's canonical documents, markers, or the bundle root.
+var reservedAssetNames = map[string]bool{
+	"SKILL.md": true, "ACTION.md": true, ".archived": true,
+	"origin": true, ".taolu-version": true, taoluFilesDir: true,
+}
+
+// ValidateAssets checks each asset's path and size. Paths must be relative to
+// the files/ bundle root: no absolute paths, no ".", ".." or empty segments,
+// no reserved names, and no duplicates.
+func ValidateAssets(assets []Asset) error {
+	seen := map[string]bool{}
+	var total int64
+	for _, a := range assets {
+		if a.Path == "" {
+			return errors.New("asset path is required")
+		}
+		if filepath.IsAbs(a.Path) {
+			return fmt.Errorf("invalid asset path %q: must be relative to the files/ directory", a.Path)
+		}
+		if strings.ContainsAny(a.Path, "\\") {
+			return fmt.Errorf("invalid asset path %q: backslash is not allowed", a.Path)
+		}
+		clean := filepath.Clean(a.Path)
+		if clean != a.Path {
+			return fmt.Errorf("invalid asset path %q: must already be clean (no '.' or '..' segments)", a.Path)
+		}
+		if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
+			return fmt.Errorf("invalid asset path %q: must not escape the files/ directory", a.Path)
+		}
+		for _, seg := range strings.Split(clean, string(filepath.Separator)) {
+			if seg == "" || seg == "." || seg == ".." {
+				return fmt.Errorf("invalid asset path %q: empty or dot segments are not allowed", a.Path)
+			}
+		}
+		if reservedAssetNames[clean] || strings.HasPrefix(clean, taoluFilesDir+string(filepath.Separator)) {
+			return fmt.Errorf("invalid asset path %q: reserved name", a.Path)
+		}
+		if seen[clean] {
+			return fmt.Errorf("duplicate asset path %q", a.Path)
+		}
+		seen[clean] = true
+		n := int64(len(a.Content))
+		total += n
+		if n > maxAssetBytes {
+			return fmt.Errorf("asset %q is %d bytes, exceeds per-file limit of %d", a.Path, n, maxAssetBytes)
+		}
+		if total > maxAssetTotalBytes {
+			return fmt.Errorf("asset bundle exceeds total limit of %d bytes", maxAssetTotalBytes)
+		}
+	}
+	return nil
+}
+
 // parseSkillPath parses taolus/<group>/<name>/SKILL.md. Returns ok=false for
 // any other file (including legacy practices/ paths and support files inside a
 // taolu directory).
@@ -175,6 +253,24 @@ func parseSkillPath(p string) (group, name string, ok bool) {
 		return "", "", false
 	}
 	return group, name, true
+}
+
+// parseAssetPath parses an asset path taolus/<group>/<name>/files/<rel...>.
+// Returns ok=false for any other file (including SKILL.md/ACTION.md and stray
+// files inside the taolu directory).
+func parseAssetPath(p string) (group, name, rel string, ok bool) {
+	if !strings.HasPrefix(p, taoluRoot+string(filepath.Separator)) {
+		return "", "", "", false
+	}
+	parts := strings.Split(p, string(filepath.Separator))
+	if len(parts) < 5 || parts[0] != taoluRoot || parts[3] != taoluFilesDir {
+		return "", "", "", false
+	}
+	group, name = parts[1], parts[2]
+	if group == "" || name == "" || group == "." || name == "." {
+		return "", "", "", false
+	}
+	return group, name, strings.Join(parts[4:], string(filepath.Separator)), true
 }
 
 func skillGroup(path string) string {

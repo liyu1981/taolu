@@ -201,3 +201,45 @@ func TestShortUUID(t *testing.T) {
 		t.Errorf("ShortUUID(short) = %q", got)
 	}
 }
+
+func TestValidateAssets(t *testing.T) {
+	valid := []Asset{
+		{Path: "Button.tsx", Content: "x"},
+		{Path: "components/deep/Icon.tsx", Content: "y"},
+		{Path: "a-b.tsx", Content: "z"},
+	}
+	if err := ValidateAssets(valid); err != nil {
+		t.Fatalf("valid assets rejected: %v", err)
+	}
+
+	bad := []struct {
+		asset Asset
+		want  string
+	}{
+		{Asset{Path: "", Content: "x"}, "required"},
+		{Asset{Path: "/abs/Button.tsx", Content: "x"}, "relative"},
+		{Asset{Path: "..", Content: "x"}, "escape"},
+		{Asset{Path: "../Button.tsx", Content: "x"}, "escape"},
+		{Asset{Path: "a/../../b.tsx", Content: "x"}, "clean"},
+		{Asset{Path: "a/./b.tsx", Content: "x"}, "clean"},
+		{Asset{Path: "a\\b.tsx", Content: "x"}, "backslash"},
+		{Asset{Path: "SKILL.md", Content: "x"}, "reserved"},
+		{Asset{Path: "ACTION.md", Content: "x"}, "reserved"},
+		{Asset{Path: ".archived", Content: "x"}, "reserved"},
+		{Asset{Path: "files", Content: "x"}, "reserved"},
+		{Asset{Path: "files/x.ts", Content: "x"}, "reserved"},
+	}
+	for _, c := range bad {
+		if err := ValidateAssets([]Asset{c.asset}); err == nil {
+			t.Errorf("ValidateAssets(%q) = nil, want error containing %q", c.asset.Path, c.want)
+		} else if !strings.Contains(err.Error(), c.want) {
+			t.Errorf("ValidateAssets(%q) = %v, want error containing %q", c.asset.Path, err, c.want)
+		}
+	}
+
+	// Duplicate paths are rejected together.
+	dups := []Asset{{Path: "a.tsx", Content: "1"}, {Path: "a.tsx", Content: "2"}}
+	if err := ValidateAssets(dups); err == nil || !strings.Contains(err.Error(), "duplicate") {
+		t.Errorf("duplicate assets: err = %v, want duplicate error", err)
+	}
+}

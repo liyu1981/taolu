@@ -116,6 +116,30 @@ Every taolu's skill is a SKILL.md document with YAML frontmatter:
 - Keep the description specific enough that an agent can choose correctly.
 - Use concrete, actionable instructions. Prefer small, focused taolus.
 
+### 5b. Carry code: snippets and complete components
+
+A taolu can carry code at three levels of fidelity:
+
+1. **Inline snippet** — a fenced block in the SKILL.md body. Right for a few
+   lines of example code.
+2. **Single reusable file** — a template or boilerplate stored as one asset.
+3. **Complete component** — a multi-file artifact (e.g. a React component with
+   .tsx, .css, .test.tsx) stored as a bundle.
+
+Tiers 2 and 3 use the **files/ bundle**: assets live under
+taolus/<group>/<name>/files/ in the vault and are addressed by path relative
+to that directory (e.g. Button.tsx, components/Button.tsx). Save them with
+the files argument on taolu_save:
+
+- Collect each file's path (relative to files/) and content from the source
+  project.
+- Reference assets from SKILL.md by their relative path (see files/Button.tsx);
+  because install preserves the tree, the references hold in the installed skill.
+- Keep assets verbatim; if a component needs adapting per project, say so in the
+  SKILL.md/ACTION.md prose — the agent applies the adaptation.
+- The whole bundle is part of the taolu: it versions, diffs, renames, and
+  archives with SKILL.md and ACTION.md as one unit.
+
 ### 6. Write the ACTION.md
 
 Use the action mode confirmed in step 2:
@@ -148,18 +172,21 @@ Before saving or applying the taolu, get explicit approval:
 ## How to save / update
 
 - taolu_save with the name, a group (e.g. backend, frontend, workflows, meta),
-  the full SKILL.md content, and the ACTION.md content.
-- The server validates both, commits them together, and labels the new version
-  (v1, v2, ...). Provide a concise message describing the change.
+  the full SKILL.md content, the ACTION.md content, and optionally a files
+  array of {path, content} pairs for the files/ bundle.
+- The server validates all of it, commits everything together, and labels the
+  new version (v1, v2, ...). Provide a concise message describing the change.
 - Saving again with the same name creates a new version; nothing is lost.
 - Always review and get explicit approval before saving (see step 7 above);
   when updating an existing taolu, show what changed.
 
 ## How to apply / upgrade / roll back
 
-- taolu_list to find taolus; taolu_get to read one (skill + action).
+- taolu_list to find taolus; taolu_get to read one (skill + action + asset
+  manifest); taolu_export to get the full bundle with every file's content.
 - taolu_apply dispatches on the action mode: apply returns the content for a
-  one-shot use; install/enforce write the skill and a .taolu-version pin.
+  one-shot use; install/enforce write the skill, its files/ assets, and a
+  .taolu-version pin, preserving the asset tree.
 - To upgrade, read the pin, check taolu_history and taolu_diff, then apply the
   newer version (or an older one to roll back). Pins make the upgrade explicit.
 

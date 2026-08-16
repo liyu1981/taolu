@@ -58,7 +58,7 @@ func newTestVault(t *testing.T) *libfossil.Repo {
 // returned label to be v1.
 func saveTestTaolu(t *testing.T, r *libfossil.Repo, group, name string) {
 	t.Helper()
-	label, _, _, err := SaveTaolu(r, group, name, skillContent(name), testAction, "seed "+name, "tester", "")
+	label, _, _, err := SaveTaolu(r, group, name, skillContent(name), testAction, nil, "seed "+name, "tester", "")
 	if err != nil {
 		t.Fatalf("SaveTaolu(%s): %v", name, err)
 	}
@@ -71,9 +71,20 @@ func saveTestTaolu(t *testing.T, r *libfossil.Repo, group, name string) {
 // error, returning the version label.
 func saveTaoluContent(t *testing.T, r *libfossil.Repo, group, name, skill, action, message string) string {
 	t.Helper()
-	label, _, _, err := SaveTaolu(r, group, name, skill, action, message, "tester", "")
+	label, _, _, err := SaveTaolu(r, group, name, skill, action, nil, message, "tester", "")
 	if err != nil {
 		t.Fatalf("SaveTaolu(%s) content: %v", name, err)
+	}
+	return label
+}
+
+// saveTaoluAssets saves the given skill/action content with a files/ bundle,
+// failing the test on error and returning the version label.
+func saveTaoluAssets(t *testing.T, r *libfossil.Repo, group, name, skill, action string, assets []Asset, message string) string {
+	t.Helper()
+	label, _, _, err := SaveTaolu(r, group, name, skill, action, assets, message, "tester", "")
+	if err != nil {
+		t.Fatalf("SaveTaolu(%s) assets: %v", name, err)
 	}
 	return label
 }
@@ -89,4 +100,13 @@ func mustFindSkill(t *testing.T, r *libfossil.Repo, name string) string {
 		t.Fatalf("FindSkillPath(%s) = \"\", want present", name)
 	}
 	return sp
+}
+
+// buttonAssets is a small multi-file component bundle used by asset tests.
+func buttonAssets() []Asset {
+	return []Asset{
+		{Path: "Button.tsx", Content: "export const Button = () => <button />;\n"},
+		{Path: "Button.css", Content: ".button { color: hotpink; }\n"},
+		{Path: "components/Icon.tsx", Content: "export const Icon = () => <svg />;\n"},
+	}
 }

@@ -77,12 +77,16 @@ func RegisterTaoluTools(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_save",
-		Description: "Save a taolu (SKILL.md + ACTION.md) to the vault as a new version. Validates slugs and both frontmatters, commits both files together, and tags the version (v1, v2, ... unless version_label is given).",
+		Description: "Save a taolu (SKILL.md + ACTION.md, plus optional files/ assets) to the vault as a new version. Validates slugs, both frontmatters, and asset paths, commits all files together, and tags the version (v1, v2, ... unless version_label is given).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		Name         string `json:"name" jsonschema:"taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`
-		Group        string `json:"group" jsonschema:"group folder, e.g. backend, frontend, workflows, meta (required)"`
-		Skill        string `json:"skill" jsonschema:"full SKILL.md content including YAML frontmatter (required)"`
-		Action       string `json:"action" jsonschema:"full ACTION.md content including YAML frontmatter (required)"`
+		Name   string `json:"name" jsonschema:"taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`
+		Group  string `json:"group" jsonschema:"group folder, e.g. backend, frontend, workflows, meta (required)"`
+		Skill  string `json:"skill" jsonschema:"full SKILL.md content including YAML frontmatter (required)"`
+		Action string `json:"action" jsonschema:"full ACTION.md content including YAML frontmatter (required)"`
+		Files  []struct {
+			Path    string `json:"path" jsonschema:"asset path relative to the files/ directory, e.g. Button.tsx or components/Button.tsx (required)"`
+			Content string `json:"content" jsonschema:"asset file content (required)"`
+		} `json:"files,omitempty" jsonschema:"optional files/ assets: each {path, content} pair is committed as a support file of the taolu"`
 		VersionLabel string `json:"version_label,omitempty" jsonschema:"explicit version label; defaults to the next vN for this taolu"`
 		Message      string `json:"message,omitempty" jsonschema:"commit message describing the change"`
 		User         string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
@@ -100,6 +104,10 @@ func RegisterTaoluTools(server *mcp.Server) {
 		if err := vault.ValidateAction(args.Action); err != nil {
 			return nil, nil, err
 		}
+		assets := make([]vault.Asset, 0, len(args.Files))
+		for _, f := range args.Files {
+			assets = append(assets, vault.Asset{Path: f.Path, Content: f.Content})
+		}
 		r, p, err := vault.OpenVault(args.Path)
 		if err != nil {
 			return nil, nil, err
@@ -116,17 +124,17 @@ func RegisterTaoluTools(server *mcp.Server) {
 				return nil, nil, fmt.Errorf("taolu %q is archived; restore it before saving a new version", args.Name)
 			}
 		}
-		label, uuid, total, err := vault.SaveTaolu(r, args.Group, args.Name, args.Skill, args.Action, args.Message, args.User, args.VersionLabel)
+		label, uuid, total, err := vault.SaveTaolu(r, args.Group, args.Name, args.Skill, args.Action, assets, args.Message, args.User, args.VersionLabel)
 		if err != nil {
 			return nil, nil, err
 		}
-		return textResult(fmt.Sprintf("saved %s/%s\nversion: %s (%s)\ntotal versions: %d\nvault: %s",
-			args.Group, args.Name, label, vault.ShortUUID(uuid), total, p)), nil, nil
+		return textResult(fmt.Sprintf("saved %s/%s\nversion: %s (%s)\ntotal versions: %d\nfiles: %d\nvault: %s",
+			args.Group, args.Name, label, vault.ShortUUID(uuid), total, len(assets), p)), nil, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_get",
-		Description: "Return the SKILL.md and ACTION.md of a taolu at a given version (empty/tip, a vN label, or a UUID prefix). The pair is returned together.",
+		Description: "Return the SKILL.md and ACTION.md of a taolu at a given version (empty/tip, a vN label, or a UUID prefix), plus a manifest of any files/ assets. The taolu is returned as one unit.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Name    string `json:"name" jsonschema:"taolu name (required)"`
 		Version string `json:"version,omitempty" jsonschema:"version to read (vN label or UUID prefix); defaults to latest"`
@@ -140,7 +148,7 @@ func RegisterTaoluTools(server *mcp.Server) {
 			return nil, nil, err
 		}
 		defer r.Close()
-		skill, action, err := vault.ReadTaoluAtVersion(r, args.Name, args.Version)
+		skill, action, assets, err := vault.ReadTaoluBundle(r, args.Name, args.Version)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -155,6 +163,13 @@ func RegisterTaoluTools(server *mcp.Server) {
 			fmt.Fprintf(&b, "## ARCHIVED — do not use this taolu\n\n")
 		}
 		fmt.Fprintf(&b, "## SKILL.md\n\n%s\n\n## ACTION.md\n\n%s", skill, action)
+		if len(assets) > 0 {
+			fmt.Fprintf(&b, "\n\n## Files\n\n")
+			for _, a := range assets {
+				fmt.Fprintf(&b, "files/%s\n", a.Path)
+			}
+			fmt.Fprintf(&b, "\n(full asset content via taolu_export)")
+		}
 		return textResult(b.String()), nil, nil
 	})
 
@@ -361,20 +376,28 @@ func RegisterTaoluTools(server *mcp.Server) {
 		}
 		switch res.Mode {
 		case vault.ModeApply:
-			return textResult(fmt.Sprintf("taolu %s (mode: apply)\n\n## SKILL.md\n\n%s\n\n## ACTION.md\n\n%s",
-				args.Name, res.Skill, res.Action)), nil, nil
+			var b strings.Builder
+			fmt.Fprintf(&b, "taolu %s (mode: apply)\n\n## SKILL.md\n\n%s\n\n## ACTION.md\n\n%s", args.Name, res.Skill, res.Action)
+			if len(res.Assets) > 0 {
+				fmt.Fprintf(&b, "\n\n## Files\n\n")
+				for _, a := range res.Assets {
+					fmt.Fprintf(&b, "files/%s\n", a.Path)
+				}
+				fmt.Fprintf(&b, "\n(full asset content via taolu_export)")
+			}
+			return textResult(b.String()), nil, nil
 		case vault.ModeInstall:
-			return textResult(fmt.Sprintf("installed %s to %s\nversion: %s\npinned: %s/.taolu-version\nvault: %s",
-				args.Name, res.Rel, versionLabelOrTip(res.Label), res.Rel, p)), nil, nil
+			return textResult(fmt.Sprintf("installed %s to %s\nversion: %s\nfiles: %d\npinned: %s/.taolu-version\nvault: %s",
+				args.Name, res.Rel, versionLabelOrTip(res.Label), len(res.Assets), res.Rel, p)), nil, nil
 		default: // enforce
-			return textResult(fmt.Sprintf("enforced %s to %s\nversion: %s\npinned: %s/.taolu-version\nAGENTS.md: reference added\nvault: %s",
-				args.Name, res.Rel, versionLabelOrTip(res.Label), res.Rel, p)), nil, nil
+			return textResult(fmt.Sprintf("enforced %s to %s\nversion: %s\nfiles: %d\npinned: %s/.taolu-version\nAGENTS.md: reference added\nvault: %s",
+				args.Name, res.Rel, versionLabelOrTip(res.Label), len(res.Assets), res.Rel, p)), nil, nil
 		}
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_export",
-		Description: "Export the raw SKILL.md and ACTION.md content of a taolu at a given version (for review or copying elsewhere).",
+		Description: "Export the raw content of a taolu at a given version (for review or copying elsewhere): SKILL.md, ACTION.md, and every files/ asset with full content.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Name    string `json:"name" jsonschema:"taolu name (required)"`
 		Version string `json:"version,omitempty" jsonschema:"version to export (vN label or UUID prefix); defaults to latest"`
@@ -388,7 +411,7 @@ func RegisterTaoluTools(server *mcp.Server) {
 			return nil, nil, err
 		}
 		defer r.Close()
-		skill, action, err := vault.ReadTaoluAtVersion(r, args.Name, args.Version)
+		skill, action, assets, err := vault.ReadTaoluBundle(r, args.Name, args.Version)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -403,6 +426,9 @@ func RegisterTaoluTools(server *mcp.Server) {
 			fmt.Fprintf(&b, "# ARCHIVED — do not use this taolu\n\n")
 		}
 		fmt.Fprintf(&b, "== SKILL.md ==\n%s\n== ACTION.md ==\n%s", skill, action)
+		for _, a := range assets {
+			fmt.Fprintf(&b, "\n== files/%s ==\n%s", a.Path, a.Content)
+		}
 		return textResult(b.String()), nil, nil
 	})
 
@@ -518,7 +544,7 @@ func RegisterTaoluTools(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_rename",
-		Description: "Rename a taolu, optionally moving it to another group: rewrites the SKILL.md frontmatter name, moves SKILL.md, ACTION.md, and support files to the new path, and records an origin marker so version history continues under the new name instead of restarting at v1. Old history is preserved.",
+		Description: "Rename a taolu, optionally moving it to another group: rewrites the SKILL.md frontmatter name, moves SKILL.md, ACTION.md, files/ assets, and markers to the new path, and records an origin marker so version history continues under the new name instead of restarting at v1. Old history is preserved.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Name     string `json:"name" jsonschema:"current taolu name (required)"`
 		NewName  string `json:"new_name" jsonschema:"new taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`

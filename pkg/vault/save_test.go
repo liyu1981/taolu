@@ -8,7 +8,7 @@ import (
 func TestSaveTaoluVersioning(t *testing.T) {
 	r := newTestVault(t)
 	label, uuid, total, err := SaveTaolu(r, "workflows", "go-lint",
-		skillContent("go-lint"), testAction, "first version", "tester", "")
+		skillContent("go-lint"), testAction, nil, "first version", "tester", "")
 	if err != nil {
 		t.Fatalf("SaveTaolu v1: %v", err)
 	}
@@ -20,7 +20,7 @@ func TestSaveTaoluVersioning(t *testing.T) {
 	}
 
 	label, _, total, err = SaveTaolu(r, "workflows", "go-lint",
-		skillContentV2("go-lint"), testAction, "second version", "tester", "")
+		skillContentV2("go-lint"), testAction, nil, "second version", "tester", "")
 	if err != nil {
 		t.Fatalf("SaveTaolu v2: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestSaveTaoluVersioning(t *testing.T) {
 func TestSaveTaoluCustomLabel(t *testing.T) {
 	r := newTestVault(t)
 	label, _, total, err := SaveTaolu(r, "workflows", "go-lint",
-		skillContent("go-lint"), testAction, "beta", "tester", "beta")
+		skillContent("go-lint"), testAction, nil, "beta", "tester", "beta")
 	if err != nil {
 		t.Fatalf("SaveTaolu: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestSaveTaoluIdenticalContentDeduplicates(t *testing.T) {
 func TestSaveTaoluGroupConflict(t *testing.T) {
 	r := newTestVault(t)
 	saveTestTaolu(t, r, "workflows", "go-lint")
-	_, _, _, err := SaveTaolu(r, "backend", "go-lint", skillContent("go-lint"), testAction, "", "tester", "")
+	_, _, _, err := SaveTaolu(r, "backend", "go-lint", skillContent("go-lint"), testAction, nil, "", "tester", "")
 	if err == nil {
 		t.Fatal("saving same name under a different group succeeded, want conflict error")
 	}
@@ -99,7 +99,7 @@ func TestSaveTaoluGroupConflict(t *testing.T) {
 
 func TestSaveTaoluDefaultUserAndMessage(t *testing.T) {
 	r := newTestVault(t)
-	label, _, _, err := SaveTaolu(r, "workflows", "go-lint", skillContent("go-lint"), testAction, "", "", "")
+	label, _, _, err := SaveTaolu(r, "workflows", "go-lint", skillContent("go-lint"), testAction, nil, "", "", "")
 	if err != nil {
 		t.Fatalf("SaveTaolu: %v", err)
 	}
@@ -109,5 +109,39 @@ func TestSaveTaoluDefaultUserAndMessage(t *testing.T) {
 	}
 	if label != "v1" || hist[0].Message == "" || hist[0].User != "admin" {
 		t.Fatalf("defaults not applied: label=%s msg=%q user=%q", label, hist[0].Message, hist[0].User)
+	}
+}
+
+func TestSaveTaoluWithAssetsRoundTrip(t *testing.T) {
+	r := newTestVault(t)
+	assets := buttonAssets()
+	label := saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction, assets, "first component")
+
+	if label != "v1" {
+		t.Fatalf("label = %s, want v1", label)
+	}
+	skill, action, got, err := ReadTaoluBundle(r, "button", "")
+	if err != nil {
+		t.Fatalf("ReadTaoluBundle: %v", err)
+	}
+	if !strings.Contains(skill, "name: button") || !strings.Contains(action, "mode: apply") {
+		t.Errorf("skill/action mismatch:\n%s\n%s", skill, action)
+	}
+	if len(got) != len(assets) {
+		t.Fatalf("assets = %d, want %d", len(got), len(assets))
+	}
+	// Assets are sorted by path on read.
+	if got[0].Path != "Button.css" || got[1].Path != "Button.tsx" || got[2].Path != "components/Icon.tsx" {
+		t.Errorf("asset order = %v", got)
+	}
+	byPath := map[string]Asset{}
+	for _, a := range assets {
+		byPath[a.Path] = a
+	}
+	for _, g := range got {
+		want := byPath[g.Path]
+		if g.Content != want.Content {
+			t.Errorf("asset %s content = %q, want %q", g.Path, g.Content, want.Content)
+		}
 	}
 }

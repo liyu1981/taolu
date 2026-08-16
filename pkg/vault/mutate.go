@@ -53,11 +53,11 @@ func findTaolu(r *libfossil.Repo, name string) (skillPath, group string, err err
 
 // commitFullTree commits the given file set as the complete new tip manifest,
 // omitting any file not listed (used to remove files such as the archived
-// marker). Returns the new check-in RID.
-func commitFullTree(r *libfossil.Repo, files []libfossil.FileToCommit, message, user string) (int64, error) {
+// marker and dropped assets). Returns the new check-in RID and UUID.
+func commitFullTree(r *libfossil.Repo, files []libfossil.FileToCommit, message, user string) (int64, string, error) {
 	parent, err := resolveParentTip(r)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	if user == "" {
 		user = "admin"
@@ -65,7 +65,7 @@ func commitFullTree(r *libfossil.Repo, files []libfossil.FileToCommit, message, 
 	if message == "" {
 		message = "modify taolu"
 	}
-	rid, _, err := r.Commit(libfossil.CommitOpts{
+	rid, uuid, err := r.Commit(libfossil.CommitOpts{
 		Files:           files,
 		Comment:         message,
 		User:            user,
@@ -73,9 +73,9 @@ func commitFullTree(r *libfossil.Repo, files []libfossil.FileToCommit, message, 
 		PartialManifest: true,
 	})
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
-	return rid, nil
+	return rid, uuid, nil
 }
 
 // ArchiveTaolu marks a taolu as archived by committing an .archived marker
@@ -148,7 +148,7 @@ func RestoreTaolu(r *libfossil.Repo, name, message, user string) (group string, 
 	if message == "" {
 		message = fmt.Sprintf("restore taolu %s", name)
 	}
-	if _, err := commitFullTree(r, remaining, message, user); err != nil {
+	if _, _, err := commitFullTree(r, remaining, message, user); err != nil {
 		return "", err
 	}
 	return group, nil
@@ -197,13 +197,14 @@ func RenameTaolu(r *libfossil.Repo, name, newName, newGroup, message, user strin
 			remaining = append(remaining, f)
 			continue
 		}
-		switch filepath.Base(f.Name) {
+		rel := strings.TrimPrefix(f.Name, oldPrefix)
+		switch rel {
 		case "SKILL.md", "ACTION.md", originMarker:
 			// Re-added below with the renamed frontmatter / new origin.
 			continue
 		}
 		remaining = append(remaining, libfossil.FileToCommit{
-			Name:    filepath.Join(taoluRoot, newGroup, newName, filepath.Base(f.Name)),
+			Name:    filepath.Join(taoluRoot, newGroup, newName, rel),
 			Content: f.Content,
 			Perm:    f.Perm,
 		})
@@ -227,7 +228,7 @@ func RenameTaolu(r *libfossil.Repo, name, newName, newGroup, message, user strin
 	if message == "" {
 		message = fmt.Sprintf("rename taolu %s to %s", name, newName)
 	}
-	rid, err := commitFullTree(r, remaining, message, user)
+	rid, _, err := commitFullTree(r, remaining, message, user)
 	if err != nil {
 		return "", "", err
 	}

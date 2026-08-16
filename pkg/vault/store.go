@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -220,30 +221,73 @@ func UniqueGroups(skills []TaoluInfo) []string {
 	return groups
 }
 
+// ReadTaoluBundle returns the SKILL.md, ACTION.md, and files/ assets of a taolu
+// at a version. All parts are read at the same check-in, and reads use the path
+// the taolu had at that version so history stays readable across renames.
+func ReadTaoluBundle(r *libfossil.Repo, name, version string) (skill, action string, assets []Asset, err error) {
+	path, err := FindSkillPath(r, name)
+	if err != nil {
+		return "", "", nil, err
+	}
+	if path == "" {
+		return "", "", nil, fmt.Errorf("taolu %q not found in vault", name)
+	}
+	uuid, vpath, err := resolveSkillVersion(r, path, version)
+	if err != nil {
+		return "", "", nil, err
+	}
+	skillData, err := r.ReadFileAt(uuid, vpath)
+	if err != nil {
+		return "", "", nil, err
+	}
+	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(vpath), "ACTION.md"))
+	if err != nil {
+		return "", "", nil, fmt.Errorf("taolu %q has no ACTION.md at version %q", name, version)
+	}
+	assets, err = readAssetsAt(r, uuid, filepath.Dir(vpath))
+	if err != nil {
+		return "", "", nil, err
+	}
+	return string(skillData), string(actionData), assets, nil
+}
+
 // ReadTaoluAtVersion returns the SKILL.md and ACTION.md content of a taolu at
 // a version. The pair is always read at the same check-in, and reads use the
 // path the taolu had at that version so history stays readable across renames.
 func ReadTaoluAtVersion(r *libfossil.Repo, name, version string) (skill, action string, err error) {
-	path, err := FindSkillPath(r, name)
+	skill, action, _, err = ReadTaoluBundle(r, name, version)
+	return skill, action, err
+}
+
+// readAssetsAt reads the files/ assets present in the taolu directory at the
+// given check-in, sorted by path.
+func readAssetsAt(r *libfossil.Repo, uuid, dir string) ([]Asset, error) {
+	rid, err := r.ResolveVersion(uuid)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	if path == "" {
-		return "", "", fmt.Errorf("taolu %q not found in vault", name)
-	}
-	uuid, vpath, err := resolveSkillVersion(r, path, version)
+	files, err := r.ListFiles(rid)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	skillData, err := r.ReadFileAt(uuid, vpath)
-	if err != nil {
-		return "", "", err
+	prefix := filepath.Join(dir, taoluFilesDir) + string(filepath.Separator)
+	var paths []string
+	for _, f := range files {
+		if strings.HasPrefix(f.Name, prefix) {
+			paths = append(paths, f.Name)
+		}
 	}
-	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(vpath), "ACTION.md"))
-	if err != nil {
-		return "", "", fmt.Errorf("taolu %q has no ACTION.md at version %q", name, version)
+	sort.Strings(paths)
+	assets := make([]Asset, 0, len(paths))
+	for _, p := range paths {
+		data, err := r.ReadFileAt(uuid, p)
+		if err != nil {
+			return nil, err
+		}
+		rel := strings.TrimPrefix(p, prefix)
+		assets = append(assets, Asset{Path: rel, Content: string(data)})
 	}
-	return string(skillData), string(actionData), nil
+	return assets, nil
 }
 
 // versionLabel returns the semantic label (vN) of a taolu version, or "".
@@ -296,15 +340,18 @@ func SkillHistory(r *libfossil.Repo, path string) ([]PracticeVersion, error) {
 // skillHistorySegment computes the versions recorded while SKILL.md lived at
 // path (oldest first) and the origin directory the taolu was renamed from, if
 // any. Each version carries the path it was recorded under.
+//
+// A version is recorded when the taolu's content file set — SKILL.md,
+// ACTION.md, and files/**, compared by blob UUID — changes between consecutive
+// check-ins. Metadata markers (.archived, origin) and stray files do not count.
 func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, string, error) {
-	action := filepath.Join(filepath.Dir(path), "ACTION.md")
-	paths := []string{path, action}
+	dir := filepath.Dir(path)
 	entries, err := r.Timeline(libfossil.TimelineOpts{})
 	if err != nil {
 		return nil, "", err
 	}
 	var rev []PracticeVersion
-	lastUUIDs := map[string]string{}
+	prev := map[string]string(nil)
 	newestUUID := ""
 	for _, e := range entries {
 		if e.Kind != libfossil.EventKindCheckin {
@@ -314,34 +361,32 @@ func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, str
 		if err != nil {
 			return nil, "", err
 		}
-		uuids := map[string]string{}
-		for _, f := range files {
-			uuids[f.Name] = f.UUID
-		}
-		changed := false
-		for _, p := range paths {
-			u := uuids[p]
-			if u == "" {
-				continue
-			}
-			if newestUUID == "" {
-				newestUUID = e.UUID
-			}
-			if lastUUIDs[p] != u {
-				changed = true
-			}
-			lastUUIDs[p] = u
-		}
-		if !changed {
+		cur := contentFilesInDir(files, dir)
+		if len(cur) == 0 {
 			continue
 		}
-		rev = append(rev, PracticeVersion{
-			UUID:    e.UUID,
-			Date:    e.Time,
-			User:    e.User,
-			Message: e.Comment,
-			Path:    path,
-		})
+		if prev == nil {
+			prev = cur
+			newestUUID = e.UUID
+			rev = append(rev, PracticeVersion{
+				UUID:    e.UUID,
+				Date:    e.Time,
+				User:    e.User,
+				Message: e.Comment,
+				Path:    path,
+			})
+			continue
+		}
+		if !sameFileSet(prev, cur) {
+			rev = append(rev, PracticeVersion{
+				UUID:    e.UUID,
+				Date:    e.Time,
+				User:    e.User,
+				Message: e.Comment,
+				Path:    path,
+			})
+		}
+		prev = cur
 	}
 	out := make([]PracticeVersion, len(rev))
 	for i := range rev {
@@ -349,11 +394,45 @@ func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, str
 	}
 	origin := ""
 	if newestUUID != "" {
-		if data, err := r.ReadFileAt(newestUUID, filepath.Join(filepath.Dir(path), originMarker)); err == nil {
+		if data, err := r.ReadFileAt(newestUUID, filepath.Join(dir, originMarker)); err == nil {
 			origin = strings.TrimSpace(string(data))
 		}
 	}
 	return out, origin, nil
+}
+
+// contentFilesInDir returns the blob UUID of each of a taolu's content files
+// present in a check-in's manifest — SKILL.md, ACTION.md, and files/** — keyed
+// by path relative to the taolu directory. Metadata markers and stray files are
+// excluded.
+func contentFilesInDir(files []libfossil.FileEntry, dir string) map[string]string {
+	out := map[string]string{}
+	prefix := dir + string(filepath.Separator)
+	for _, f := range files {
+		if !strings.HasPrefix(f.Name, prefix) {
+			continue
+		}
+		rel := strings.TrimPrefix(f.Name, prefix)
+		if rel == "SKILL.md" || rel == "ACTION.md" ||
+			strings.HasPrefix(rel, taoluFilesDir+string(filepath.Separator)) {
+			out[rel] = f.UUID
+		}
+	}
+	return out
+}
+
+// sameFileSet reports whether two content-file maps hold the same paths with
+// the same blob UUIDs.
+func sameFileSet(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // originPathToSkill converts an origin directory under taolus/ (e.g.

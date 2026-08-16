@@ -21,6 +21,7 @@ type ApplyResult struct {
 	Mode   string
 	Skill  string
 	Action string
+	Assets []Asset
 	Rel    string
 	Label  string
 	Pinned bool
@@ -75,6 +76,10 @@ func ApplyTaolu(r *libfossil.Repo, repoPath, name, version, target, format, mode
 	if err != nil {
 		return nil, fmt.Errorf("taolu %q has no ACTION.md", name)
 	}
+	assets, err := readAssetsAt(r, uuid, filepath.Dir(vpath))
+	if err != nil {
+		return nil, err
+	}
 	am, _, err := splitActionFrontmatter(string(actionData))
 	if err != nil {
 		return nil, err
@@ -91,7 +96,7 @@ func ApplyTaolu(r *libfossil.Repo, repoPath, name, version, target, format, mode
 		mode = modeOverride
 	}
 
-	res := &ApplyResult{Mode: mode, Skill: string(skillData), Action: string(actionData), Label: label}
+	res := &ApplyResult{Mode: mode, Skill: string(skillData), Action: string(actionData), Assets: assets, Label: label}
 	if mode == ModeApply {
 		return res, nil
 	}
@@ -102,7 +107,7 @@ func ApplyTaolu(r *libfossil.Repo, repoPath, name, version, target, format, mode
 	if format == "" {
 		format = "opencode"
 	}
-	rel, err := installSkill(r, repoPath, name, uuid, skillData, label, target, format, force)
+	rel, err := installSkill(r, repoPath, name, uuid, skillData, label, assets, target, format, force)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +121,10 @@ func ApplyTaolu(r *libfossil.Repo, repoPath, name, version, target, format, mode
 	return res, nil
 }
 
-// installSkill materializes a taolu's SKILL.md into the format target with a
-// .taolu-version pin, returning the relative installed directory.
-func installSkill(r *libfossil.Repo, repoPath, name, uuid string, content []byte, label, target, format string, force bool) (string, error) {
+// installSkill materializes a taolu's SKILL.md, files/ assets, and a
+// .taolu-version pin into the format target, returning the relative installed
+// directory. Assets are written preserving their relative paths under files/.
+func installSkill(r *libfossil.Repo, repoPath, name, uuid string, content []byte, label string, assets []Asset, target, format string, force bool) (string, error) {
 	rel := installTargets[format]
 	if rel == "" {
 		return "", fmt.Errorf("unknown format %q (expected opencode, claude, or agents)", format)
@@ -127,15 +133,35 @@ func installSkill(r *libfossil.Repo, repoPath, name, uuid string, content []byte
 	if err != nil {
 		return "", err
 	}
-	skillFile := filepath.Join(dir, "SKILL.md")
-	if _, err := os.Stat(skillFile); err == nil && !force {
-		return "", fmt.Errorf("%s already exists (pass force=true to overwrite)", skillFile)
+	if !force {
+		for _, a := range assets {
+			dest := filepath.Join(dir, a.Path)
+			if _, err := os.Stat(dest); err == nil {
+				return "", fmt.Errorf("%s already exists (pass force=true to overwrite)", dest)
+			}
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
+	skillFile := filepath.Join(dir, "SKILL.md")
+	if _, err := os.Stat(skillFile); err == nil && !force {
+		return "", fmt.Errorf("%s already exists (pass force=true to overwrite)", skillFile)
+	}
 	if err := os.WriteFile(skillFile, content, 0o644); err != nil {
 		return "", err
+	}
+	for _, a := range assets {
+		dest, err := safeJoin(dir, a.Path)
+		if err != nil {
+			return "", err
+		}
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(dest, []byte(a.Content), 0o644); err != nil {
+			return "", err
+		}
 	}
 
 	pinVersion := label

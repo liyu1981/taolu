@@ -286,3 +286,47 @@ func TestListTaoluSkipsSupportFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestAssetChangeIsNewVersion(t *testing.T) {
+	r := newTestVault(t)
+	saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction, buttonAssets(), "v1")
+	// Only an asset changes; SKILL.md and ACTION.md are untouched.
+	saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction,
+		[]Asset{{Path: "Button.tsx", Content: "export const Button = () => <button/>; // new\n"}}, "v2 tweak")
+
+	hist, err := SkillHistory(r, mustFindSkill(t, r, "button"))
+	if err != nil {
+		t.Fatalf("SkillHistory: %v", err)
+	}
+	if len(hist) != 2 {
+		t.Fatalf("history length = %d, want 2 (asset-only change is a version)", len(hist))
+	}
+	_, _, assets, err := ReadTaoluBundle(r, "button", "v1")
+	if err != nil {
+		t.Fatalf("read v1: %v", err)
+	}
+	if len(assets) != 3 {
+		t.Fatalf("v1 assets = %d, want 3", len(assets))
+	}
+	_, _, assets, err = ReadTaoluBundle(r, "button", "v2")
+	if err != nil {
+		t.Fatalf("read v2: %v", err)
+	}
+	if len(assets) != 1 || assets[0].Path != "Button.tsx" {
+		t.Errorf("v2 assets = %+v, want only Button.tsx", assets)
+	}
+}
+
+func TestListTaoluIgnoresAssets(t *testing.T) {
+	r := newTestVault(t)
+	saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction, buttonAssets(), "component")
+	taolus, err := ListTaolu(r)
+	if err != nil {
+		t.Fatalf("ListTaolu: %v", err)
+	}
+	for _, s := range taolus {
+		if s.Name == "Button.tsx" || s.Name == "files" || strings.HasPrefix(s.Name, "button/") {
+			t.Errorf("asset listed as taolu: %q", s.Name)
+		}
+	}
+}

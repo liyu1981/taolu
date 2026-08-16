@@ -189,3 +189,47 @@ func TestRenameGuards(t *testing.T) {
 		}
 	}
 }
+
+func TestRenamePreservesAssetTree(t *testing.T) {
+	r := newTestVault(t)
+	saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction, buttonAssets(), "component")
+	if _, _, err := RenameTaolu(r, "button", "button-v2", "", "", "tester"); err != nil {
+		t.Fatalf("RenameTaolu: %v", err)
+	}
+
+	sp := mustFindSkill(t, r, "button-v2")
+	if !strings.HasPrefix(sp, "taolus/frontend/button-v2/") {
+		t.Fatalf("path = %q", sp)
+	}
+	_, _, assets, err := ReadTaoluBundle(r, "button-v2", "")
+	if err != nil {
+		t.Fatalf("ReadTaoluBundle: %v", err)
+	}
+	if len(assets) != len(buttonAssets()) {
+		t.Fatalf("renamed assets = %d, want %d", len(assets), len(buttonAssets()))
+	}
+	// The nested components/Icon.tsx survives the rename, not flattened.
+	found := false
+	for _, a := range assets {
+		if a.Path == "components/Icon.tsx" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("nested asset lost in rename: %+v", assets)
+	}
+
+	// History still spans the rename (v1, rename) and old versions read assets.
+	hist, err := SkillHistory(r, sp)
+	if err != nil {
+		t.Fatalf("SkillHistory: %v", err)
+	}
+	if len(hist) != 2 {
+		t.Fatalf("history length = %d, want 2", len(hist))
+	}
+	if _, _, assets, err := ReadTaoluBundle(r, "button-v2", "v1"); err != nil {
+		t.Fatalf("read v1 assets: %v", err)
+	} else if len(assets) != 3 {
+		t.Fatalf("v1 assets = %d, want 3", len(assets))
+	}
+}

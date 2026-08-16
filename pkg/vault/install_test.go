@@ -244,3 +244,45 @@ func TestShortUUIDRoundTrip(t *testing.T) {
 		t.Errorf("short %q not a prefix of %q", short, hist[0].UUID)
 	}
 }
+
+func TestInstallMaterializesAssets(t *testing.T) {
+	r := newTestVault(t)
+	saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction, buttonAssets(), "component")
+	target := t.TempDir()
+
+	res, err := ApplyTaolu(r, r.Path(), "button", "", target, "", ModeInstall, false)
+	if err != nil {
+		t.Fatalf("ApplyTaolu: %v", err)
+	}
+	if len(res.Assets) != 3 {
+		t.Fatalf("result assets = %d, want 3", len(res.Assets))
+	}
+	root := filepath.Join(target, ".opencode", "skills", "button")
+	for _, a := range buttonAssets() {
+		data, err := os.ReadFile(filepath.Join(root, a.Path))
+		if err != nil {
+			t.Fatalf("asset %s not materialized: %v", a.Path, err)
+		}
+		if string(data) != a.Content {
+			t.Errorf("asset %s content = %q, want %q", a.Path, string(data), a.Content)
+		}
+	}
+}
+
+func TestInstallRefusesOverwriteOfAsset(t *testing.T) {
+	r := newTestVault(t)
+	saveTaoluAssets(t, r, "frontend", "button", skillContent("button"), testAction, buttonAssets(), "component")
+	target := t.TempDir()
+
+	if _, err := ApplyTaolu(r, r.Path(), "button", "", target, "", ModeInstall, false); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+	// A pre-existing asset must block reinstall without force, like SKILL.md.
+	os.WriteFile(filepath.Join(target, ".opencode", "skills", "button", "Button.css"), []byte("edited"), 0o644)
+	if _, err := ApplyTaolu(r, r.Path(), "button", "", target, "", ModeInstall, false); err == nil {
+		t.Error("overwrite of asset without force succeeded")
+	}
+	if _, err := ApplyTaolu(r, r.Path(), "button", "", target, "", ModeInstall, true); err != nil {
+		t.Errorf("forced overwrite failed: %v", err)
+	}
+}
