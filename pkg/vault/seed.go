@@ -40,7 +40,30 @@ versioned in the Fossil database.
 
 ## How to summarize a project into a taolu
 
-### 1. Survey the project
+### 1. Confirm the taolu's scope
+
+Establish the scope **before** surveying the project. If the user did not
+specify it, ask and confirm before summarizing:
+
+- What should this taolu cover? One component (e.g. go-api-server), a
+  horizontal area (e.g. backend conventions), or the whole project?
+- What should stay out of scope?
+
+Do not invent a scope and start drafting; confirm it first.
+
+### 2. Confirm the action
+
+Decide the action mode with the user. If the user did not specify it, confirm
+with the user before proceeding — do not default silently:
+
+- **apply**: use once on the current project, nothing saved.
+- **install**: make the skill available in the project's skill store.
+- **enforce**: a project-wide convention every agent must follow (installs and
+  adds an AGENTS.md reference).
+
+State the confirmed mode back to the user so the choice is explicit.
+
+### 3. Survey the project
 
 Read the project's context before drafting anything:
 
@@ -49,7 +72,7 @@ Read the project's context before drafting anything:
 - Tooling and configs (build, lint, test, CI, secrets, package manifests).
 - How code is organized and how features are implemented.
 
-### 2. Extract the conventions
+### 4. Extract the conventions
 
 Focus on durable, actionable conventions, not trivia:
 
@@ -60,7 +83,7 @@ Focus on durable, actionable conventions, not trivia:
 - Configuration, secrets, and environment handling.
 - Build, release, and CI workflow.
 
-### 3. Write the SKILL.md draft
+### 5. Write the SKILL.md draft
 
 Every taolu's skill is a SKILL.md document with YAML frontmatter:
 
@@ -85,9 +108,9 @@ Every taolu's skill is a SKILL.md document with YAML frontmatter:
 - Keep the description specific enough that an agent can choose correctly.
 - Use concrete, actionable instructions. Prefer small, focused taolus.
 
-### 4. Write the ACTION.md
+### 6. Write the ACTION.md
 
-Choose the mode that matches how the taolu should be used:
+Use the action mode confirmed in step 2:
 
     ---
     mode: install        # apply | install | enforce
@@ -100,6 +123,16 @@ Choose the mode that matches how the taolu should be used:
 - Choose **enforce** for a project-wide convention that every agent must
   follow (installs and adds an AGENTS.md reference).
 
+### 7. Review before sending out
+
+Before sending out the taolu (saving it or applying it), ask the user to
+review it:
+
+- Present the taolu for review. If the taolu is long, provide a brief of it
+  (name, group, action mode, one-line description, and a short summary of the
+  conventions it captures) and offer the option to review it in full length.
+- Only save or apply after the user has reviewed and approved.
+
 ## How to save / update
 
 - taolu_save with the name, a group (e.g. backend, frontend, workflows, meta),
@@ -107,6 +140,8 @@ Choose the mode that matches how the taolu should be used:
 - The server validates both, commits them together, and labels the new version
   (v1, v2, ...). Provide a concise message describing the change.
 - Saving again with the same name creates a new version; nothing is lost.
+- Always review the taolu with the user first (see step 7 above) before saving;
+  when updating an existing taolu, show what changed.
 
 ## How to apply / upgrade / roll back
 
