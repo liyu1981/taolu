@@ -32,62 +32,63 @@
     "Liberation Mono", monospace;
 }
 
+/* hsl() wrapper at the source — every downstream var(--x) is now a valid color. */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(240 10% 3.9%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(240 10% 3.9%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(240 10% 3.9%);
+  --primary: hsl(240 5.9% 10%);
+  --primary-foreground: hsl(0 0% 98%);
+  --secondary: hsl(240 4.8% 95.9%);
+  --secondary-foreground: hsl(240 5.9% 10%);
+  --muted: hsl(240 4.8% 95.9%);
+  --muted-foreground: hsl(240 3.8% 46.1%);
+  --accent: hsl(240 4.8% 95.9%);
+  --accent-foreground: hsl(240 5.9% 10%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(240 5.9% 90%);
+  --input: hsl(240 5.9% 90%);
+  --ring: hsl(240 5.9% 10%);
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --background: hsl(240 10% 3.9%);
+  --foreground: hsl(0 0% 98%);
+  --card: hsl(240 10% 3.9%);
+  --card-foreground: hsl(0 0% 98%);
+  --popover: hsl(240 10% 3.9%);
+  --popover-foreground: hsl(0 0% 98%);
+  --primary: hsl(0 0% 98%);
+  --primary-foreground: hsl(240 5.9% 10%);
+  --secondary: hsl(240 3.7% 15.9%);
+  --secondary-foreground: hsl(0 0% 98%);
+  --muted: hsl(240 3.7% 15.9%);
+  --muted-foreground: hsl(240 5% 64.9%);
+  --accent: hsl(240 3.7% 15.9%);
+  --accent-foreground: hsl(0 0% 98%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(240 3.7% 15.9%);
+  --input: hsl(240 3.7% 15.9%);
+  --ring: hsl(240 4.9% 83.9%);
 }
 
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    border-color: var(--border);
   }
   html {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: var(--background);
+    color: var(--foreground);
   }
   h1,
   h2,
@@ -102,10 +103,10 @@
   .glass-control {
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, hsl(var(--background)) 45%, transparent),
-      color-mix(in oklch, hsl(var(--background)) 14%, transparent)
+      color-mix(in oklch, var(--background) 45%, transparent),
+      color-mix(in oklch, var(--background) 14%, transparent)
     );
-    border: 1px solid color-mix(in oklch, hsl(var(--border)), transparent 45%);
+    border: 1px solid color-mix(in oklch, var(--border), transparent 45%);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     box-shadow:
@@ -116,17 +117,17 @@
   .apple-panel {
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, hsl(var(--background)) 68%, transparent),
-      color-mix(in oklch, hsl(var(--background)) 34%, transparent)
+      color-mix(in oklch, var(--background) 68%, transparent),
+      color-mix(in oklch, var(--background) 34%, transparent)
     );
-    border-bottom: 1px solid color-mix(in oklch, hsl(var(--border)), transparent 45%);
+    border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 45%);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     box-shadow: inset 0 1px 0 color-mix(in oklch, white 28%, transparent);
   }
 
   .apple-panel-dark {
-    background: color-mix(in oklch, hsl(var(--background)) 25%, transparent);
+    background: color-mix(in oklch, var(--background) 25%, transparent);
     backdrop-filter: blur(30px) saturate(200%);
     -webkit-backdrop-filter: blur(30px) saturate(200%);
   }
@@ -134,10 +135,10 @@
   .apple-content {
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, hsl(var(--background)) 92%, transparent),
-      color-mix(in oklch, hsl(var(--background)) 85%, transparent)
+      color-mix(in oklch, var(--background) 92%, transparent),
+      color-mix(in oklch, var(--background) 85%, transparent)
     );
-    border: 1px solid color-mix(in oklch, hsl(var(--border)), transparent 45%);
+    border: 1px solid color-mix(in oklch, var(--border), transparent 45%);
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
     box-shadow:
@@ -146,27 +147,27 @@
   }
 
   .apple-scrim {
-    background: linear-gradient(to bottom, transparent, hsl(var(--background)));
+    background: linear-gradient(to bottom, transparent, var(--background));
   }
 
   .ambient-bg {
     background:
       radial-gradient(
         1200px 600px at 12% -8%,
-        color-mix(in oklch, hsl(var(--primary)) 9%, transparent),
+        color-mix(in oklch, var(--primary) 9%, transparent),
         transparent 60%
       ),
       radial-gradient(
         1000px 520px at 100% 0%,
-        color-mix(in oklch, hsl(var(--ring)) 8%, transparent),
+        color-mix(in oklch, var(--ring) 8%, transparent),
         transparent 55%
       ),
       radial-gradient(
         900px 520px at 50% 112%,
-        color-mix(in oklch, hsl(var(--primary)) 6%, transparent),
+        color-mix(in oklch, var(--primary) 6%, transparent),
         transparent 60%
       ),
-      hsl(var(--background));
+      var(--background);
   }
 
   .dark .glass-control {
