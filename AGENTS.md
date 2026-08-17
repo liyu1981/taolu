@@ -51,3 +51,9 @@ For `fix` commits the body **must** contain both:
   (`chore(...): ... WIP`) and say so in the body.
 - Commit messages are not essays — the body should be thorough but each
   sentence must add information.
+
+<!-- taolu-enforce:apple-design -->
+- Follow the taolu apple-design (v1) in .opencode/skills/apple-design/SKILL.md
+
+<!-- taolu-enforce:glass-webui-design -->
+- Follow the taolu glass-webui-design (v1) in .opencode/skills/glass-webui-design/SKILL.md
