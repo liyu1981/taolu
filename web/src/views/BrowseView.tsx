@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { api } from "@/lib/api";
 import type { TaoluItem } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -85,13 +85,13 @@ export default function BrowseView() {
             ))}
           </SelectContent>
         </Select>
-        <Button
-          variant={showArchived ? "glass" : "ghost"}
-          size="sm"
-          onClick={() => setShowArchived((v) => !v)}
-        >
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <Switch
+            checked={showArchived}
+            onCheckedChange={setShowArchived}
+          />
           Show archived
-        </Button>
+        </label>
       </div>
 
       {isLoading && <Loading label="Loading taolus…" />}
