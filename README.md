@@ -63,9 +63,15 @@ so multiple opencode instances connect to one process — the vault is touched b
 a single process and there is no SQLite lock contention.
 
 ```sh
-./taolu                     # listens on http://127.0.0.1:8264
+./taolu                     # starts both MCP server (:8264) and web UI (:8265)
+./taolu --mcp-only          # starts only the MCP server (no web UI)
+./taolu --web-only          # starts only the web UI (no MCP server)
 ./taolu --stdio             # instead: single-process stdio mode
 ```
+
+The web UI is a read-only browser for the vault (system status, taolu browser,
+and per-taolu version history, content, and diffs). It listens on the MCP port
++ 1 by default (`TAOLU_WEB_PORT`, `0` disables it).
 
 On startup the server **creates and seeds the default vault if it does not
 exist** (creating `~/.taolu/vault.fossil`, seeding the `taolu-authoring` guide,
@@ -86,6 +92,8 @@ Server binding:
 
 - `TAOLU_HOST` (default `127.0.0.1`) and `TAOLU_PORT` (default `8264`)
   configure the HTTP listen address.
+- `TAOLU_WEB_PORT` (default `TAOLU_PORT + 1`, e.g. `8265`) configures the web
+  UI port; set it to `0` to disable the web UI.
 
 Run `taolu_init` only for a non-default vault path. Opening a pre-v1 vault migrates any
 legacy `practices/` tree to `taolus/` automatically.

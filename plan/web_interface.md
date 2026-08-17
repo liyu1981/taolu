@@ -236,7 +236,11 @@ and `b` → GET `/api/taolus/:name/diff?a=…&b=…` → highlighted diff render
 8. **Diff granularity** — per-file unified diffs (SKILL.md / ACTION.md / assets),
    matching `taolu_diff`; no whole-taolu combined toggle. ✅
 9. **Rendering depth** — raw text only. SKILL.md/ACTION.md and assets are shown
-   as plain, syntax-highlighted text; no markdown rendering. ✅
+    as plain, syntax-highlighted text; no markdown rendering. ✅
+ 10. **Startup modes** — the default runs both the MCP server and the web UI;
+    `--mcp-only` runs just the MCP server and `--web-only` runs just the web UI.
+    `TAOLU_WEB_PORT`/`--mcp-only` disable the UI; `--web-only` skips the MCP
+    server. ✅
 
 ## 10. Open questions (resolved)
 

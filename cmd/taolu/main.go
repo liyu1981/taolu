@@ -29,18 +29,38 @@ const (
 )
 
 func main() {
-	stdio := flag.Bool("stdio", false, "run as a stdio MCP server (default is HTTP)")
+	stdio := flag.Bool("stdio", false, "run as a stdio MCP server instead of HTTP")
+	mcpOnly := flag.Bool("mcp-only", false, "run only the MCP HTTP server (disable the web UI)")
+	webOnly := flag.Bool("web-only", false, "run only the web UI server (disable the MCP server)")
 	flag.Parse()
+
+	if *mcpOnly && *webOnly {
+		log.Fatal("--mcp-only and --web-only are mutually exclusive")
+	}
+	if *stdio && *webOnly {
+		log.Fatal("--stdio and --web-only are mutually exclusive")
+	}
 
 	if err := initVaultAtStartup(); err != nil {
 		log.Fatalf("initialize vault: %v", err)
 	}
 
-	if *stdio {
+	var shutdowns []func()
+	switch {
+	case *stdio:
 		runStdio()
 		return
+	case *webOnly:
+		shutdowns = append(shutdowns, startWebServer())
+	case *mcpOnly:
+		shutdowns = append(shutdowns, startMCPServer())
+	default:
+		shutdowns = append(shutdowns, startMCPServer())
+		if stop := startWebServer(); stop != nil {
+			shutdowns = append(shutdowns, stop)
+		}
 	}
-	runHTTP()
+	waitForShutdown(shutdowns)
 }
 
 // initVaultAtStartup creates and seeds the default vault if it does not exist,
@@ -68,7 +88,9 @@ func runStdio() {
 	}
 }
 
-func runHTTP() {
+// startMCPServer starts the MCP Streamable HTTP server and returns its
+// shutdown function.
+func startMCPServer() func() {
 	server, err := newServer()
 	if err != nil {
 		log.Fatalf("failed to create server: %v", err)
@@ -88,27 +110,13 @@ func runHTTP() {
 		}
 	}()
 
-	stopWeb := runWebServer()
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Printf("graceful shutdown: %v; closing", err)
-		if cerr := httpServer.Close(); cerr != nil {
-			log.Printf("close: %v", cerr)
-		}
-	}
-	if stopWeb != nil {
-		stopWeb()
-	}
+	return func() { shutdownServer(httpServer) }
 }
 
-// runWebServer starts the browser UI on the MCP port + 1. It is disabled when
-// TAOLU_WEB_PORT is "0". It returns a stop function, or nil if not started.
-func runWebServer() func() {
+// startWebServer starts the browser UI on the MCP port + 1. It is disabled when
+// TAOLU_WEB_PORT is "0". It returns the web server's shutdown function, or nil
+// when disabled.
+func startWebServer() func() {
 	host := os.Getenv("TAOLU_HOST")
 	if host == "" {
 		host = defaultHost
@@ -129,12 +137,28 @@ func runWebServer() func() {
 		}
 	}()
 	log.Printf("web UI listening on http://%s", webServer.Addr)
-	return func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		if err := webServer.Shutdown(ctx); err != nil {
-			_ = webServer.Close()
+	return func() { shutdownServer(webServer) }
+}
+
+// shutdownServer gracefully stops an http.Server with a short timeout.
+func shutdownServer(s *http.Server) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := s.Shutdown(ctx); err != nil {
+		log.Printf("graceful shutdown: %v; closing", err)
+		if cerr := s.Close(); cerr != nil {
+			log.Printf("close: %v", cerr)
 		}
+	}
+}
+
+// waitForShutdown blocks until SIGINT/SIGTERM, then runs the shutdown funcs.
+func waitForShutdown(stops []func()) {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+	for _, s := range stops {
+		s()
 	}
 }
 
