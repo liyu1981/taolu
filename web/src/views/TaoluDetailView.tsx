@@ -34,7 +34,7 @@ export default function TaoluDetailView() {
           <Link to="/taolu" className="text-sm text-muted-foreground hover:text-foreground">
             ← Browse
           </Link>
-          <h1 className="text-2xl font-semibold mt-1 flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight mt-1 flex items-center gap-2">
             {detail.data.name}
             {detail.data.archived && <Badge variant="destructive">archived</Badge>}
           </h1>
@@ -90,13 +90,15 @@ function OverviewTab({ detail }: { detail: TaoluDetail }) {
       {detail.assets.length > 0 && (
         <div>
           <h3 className="text-sm font-medium mb-2">files/ assets</h3>
-          <ul className="space-y-1 font-mono text-xs">
-            {detail.assets.map((a) => (
-              <li key={a.path} className="text-muted-foreground">
-                files/{a.path}
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-xl glass-control bg-clip-padding px-4 py-3">
+            <ul className="space-y-1 font-mono text-xs">
+              {detail.assets.map((a) => (
+                <li key={a.path} className="text-muted-foreground">
+                  files/{a.path}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </div>
@@ -120,7 +122,10 @@ function HistoryTab({
   return (
     <div className="space-y-2">
       {[...history].reverse().map((v) => (
-        <div key={v.uuid} className="flex items-start gap-4 rounded-md border px-4 py-3">
+        <div
+          key={v.uuid}
+          className="flex items-start gap-4 rounded-xl glass-control bg-clip-padding px-4 py-3"
+        >
           <Badge variant="outline" className="font-mono shrink-0">
             {v.label}
           </Badge>

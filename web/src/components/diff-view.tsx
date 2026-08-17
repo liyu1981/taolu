@@ -1,28 +1,27 @@
-import { Fragment } from "react";
 import type { DiffFile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function DiffRows({ unified }: { unified: string }) {
   const lines = unified.split("\n");
   return (
-    <pre className="p-3 overflow-x-auto text-xs leading-relaxed font-mono whitespace-pre">
+    <pre className="p-3 overflow-x-auto text-xs leading-relaxed font-mono whitespace-pre text-foreground">
       {lines.map((line, i) => {
         let kind = "context" as "add" | "del" | "context";
-        let cls = "text-zinc-300";
+        let cls = "text-foreground/85";
         if (line.startsWith("+")) {
           kind = "add";
-          cls = "bg-emerald-500/15 text-emerald-200";
+          cls = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
         } else if (line.startsWith("-")) {
           kind = "del";
-          cls = "bg-red-500/15 text-red-200";
+          cls = "bg-red-500/15 text-red-700 dark:text-red-400";
         } else if (line.startsWith("@")) {
-          cls = "bg-zinc-800 text-zinc-300";
+          cls = "bg-foreground/5 text-muted-foreground";
         } else if (line.startsWith("+++") || line.startsWith("---")) {
-          cls = "text-zinc-500";
+          cls = "text-muted-foreground";
         }
         return (
           <div key={i} className={cn("flex", cls)}>
-            <span className="select-none w-4 shrink-0 text-zinc-600">
+            <span className="select-none w-4 shrink-0 text-muted-foreground/70">
               {kind === "add" ? "+" : kind === "del" ? "-" : ""}
             </span>
             <span className="whitespace-pre-wrap break-words">{line}</span>
@@ -35,8 +34,8 @@ function DiffRows({ unified }: { unified: string }) {
 
 export function DiffBlock({ file }: { file: DiffFile }) {
   return (
-    <div className="rounded-md border bg-zinc-950 overflow-hidden">
-      <div className="border-b border-zinc-800 px-3 py-1.5 font-mono text-xs text-zinc-400">
+    <div className="rounded-xl glass-control bg-clip-padding text-foreground shadow-sm overflow-hidden">
+      <div className="border-b border-border/40 px-3 py-1.5 font-mono text-xs text-muted-foreground">
         {file.path}
       </div>
       <DiffRows unified={file.unified} />
@@ -62,5 +61,3 @@ export function DiffList({
     </div>
   );
 }
-
-export { Fragment };
