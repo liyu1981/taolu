@@ -1,0 +1,28 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "import",
+          "tailwind",
+          "layer",
+          "theme",
+          "utility",
+          "config",
+          "source",
+          "variant",
+          "custom-variant"
+        ]
+      }
+    ],
+    "import-notation": null,
+    "function-no-unknown": null,
+    "hue-degree-notation": null,
+    "value-keyword-case": null,
+    "property-no-vendor-prefix": null,
+    "alpha-value-notation": null,
+    "rule-empty-line-before": null
+  }
+}
