@@ -136,14 +136,13 @@
     -webkit-backdrop-filter: blur(30px) saturate(200%);
   }
 
-  /* Main content sheet: more opaque than glass-control so long-form content and
-     tables stay readable over the particle backdrop; still frosted so the
-     background colors bleed through softly. */
+  /* Main content sheet: translucent so the particle backdrop bleeds through
+     softly, but still opaque enough that long-form text stays readable. */
   .apple-content {
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, var(--background) 85%, transparent),
-      color-mix(in oklch, var(--background) 70%, transparent)
+      color-mix(in oklch, var(--background) 65%, transparent),
+      color-mix(in oklch, var(--background) 45%, transparent)
     );
     border: 1px solid color-mix(in oklch, var(--border), transparent 45%);
     backdrop-filter: blur(28px) saturate(160%);
@@ -207,8 +206,8 @@
   .dark .apple-content {
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, white 20%, transparent),
-      color-mix(in oklch, white 11%, transparent)
+      color-mix(in oklch, white 18%, transparent),
+      color-mix(in oklch, white 9%, transparent)
     );
     box-shadow:
       0 8px 32px rgb(0 0 0 / 0.45),
