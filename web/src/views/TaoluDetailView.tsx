@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useParams, Link } from "@tanstack/react-router";
-import { useQuery as useReactQuery } from "@tanstack/react-query";
+import { useParams, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery as useReactQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { TaoluDetail, Version, ContentFile } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ModeBadge } from "@/components/mode-badge";
@@ -21,6 +22,24 @@ export default function TaoluDetailView() {
   const history = useReactQuery({
     queryKey: ["history", name],
     queryFn: () => api.history(name),
+  });
+
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["taolu", name] });
+    queryClient.invalidateQueries({ queryKey: ["taolus"] });
+    queryClient.invalidateQueries({ queryKey: ["status"] });
+  };
+
+  const archiveMut = useMutation({
+    mutationFn: () => api.archive(name),
+    onSuccess: () => { invalidate(); navigate({ to: "/browse" }); },
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: () => api.restore(name),
+    onSuccess: invalidate,
   });
 
   if (detail.isLoading) return <Loading label="Loading taolu…" />;
@@ -43,6 +62,27 @@ export default function TaoluDetailView() {
             <span className="font-mono">{detail.data.latest_version || "—"}</span> ·{" "}
             {detail.data.version_count} version{detail.data.version_count === 1 ? "" : "s"}
           </p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {detail.data.archived ? (
+            <Button
+              variant="glass"
+              size="sm"
+              disabled={restoreMut.isPending}
+              onClick={() => restoreMut.mutate()}
+            >
+              Restore
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={archiveMut.isPending}
+              onClick={() => archiveMut.mutate()}
+            >
+              Archive
+            </Button>
+          )}
         </div>
       </div>
 

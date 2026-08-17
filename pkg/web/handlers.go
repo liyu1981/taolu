@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -540,4 +541,75 @@ func versionAOrEmpty(uuidA string) string {
 		return ""
 	}
 	return uuidA
+}
+
+// mutationBody is the optional JSON body for mutation endpoints.
+type mutationBody struct {
+	Message string `json:"message"`
+	User    string `json:"user"`
+}
+
+func decodeBody(r *http.Request) mutationBody {
+	var b mutationBody
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&b)
+	}
+	return b
+}
+
+// handleArchive archives a taolu (commits an .archived marker).
+func handleArchive(vaultPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		b := decodeBody(r)
+
+		repo, _, err := vault.OpenVault(vaultPath)
+		if err != nil {
+			apiError(w, http.StatusInternalServerError, "open vault: "+err.Error())
+			return
+		}
+		defer repo.Close()
+
+		if name == vault.SeedName {
+			apiError(w, http.StatusBadRequest, "refusing to archive the built-in taolu-authoring guide")
+			return
+		}
+
+		group, err := vault.ArchiveTaolu(repo, name, b.Message, b.User)
+		if err != nil {
+			apiError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		jsonOK(w, map[string]string{
+			"status": "archived",
+			"group":  group,
+			"name":   name,
+		})
+	}
+}
+
+// handleRestore restores an archived taolu (removes the .archived marker).
+func handleRestore(vaultPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		b := decodeBody(r)
+
+		repo, _, err := vault.OpenVault(vaultPath)
+		if err != nil {
+			apiError(w, http.StatusInternalServerError, "open vault: "+err.Error())
+			return
+		}
+		defer repo.Close()
+
+		group, err := vault.RestoreTaolu(repo, name, b.Message, b.User)
+		if err != nil {
+			apiError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		jsonOK(w, map[string]string{
+			"status": "restored",
+			"group":  group,
+			"name":   name,
+		})
+	}
 }

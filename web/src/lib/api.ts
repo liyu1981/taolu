@@ -22,6 +22,31 @@ async function get<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function post<T>(url: string, body?: Record<string, string>): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const b = (await res.json()) as { error?: string };
+      if (b.error) msg = b.error;
+    } catch {
+      /* keep statusText */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as T;
+}
+
+export interface MutationResult {
+  status: string;
+  group: string;
+  name: string;
+}
+
 export const api = {
   status: () => get<Status>("/api/status"),
   taolus: (params?: {
@@ -58,4 +83,14 @@ export const api = {
       `/api/taolus/${encodeURIComponent(name)}/diff?${q.toString()}`,
     );
   },
+  archive: (name: string, message?: string) =>
+    post<MutationResult>(
+      `/api/taolus/${encodeURIComponent(name)}/archive`,
+      message ? { message } : undefined,
+    ),
+  restore: (name: string, message?: string) =>
+    post<MutationResult>(
+      `/api/taolus/${encodeURIComponent(name)}/restore`,
+      message ? { message } : undefined,
+    ),
 };

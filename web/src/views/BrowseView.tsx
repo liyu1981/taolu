@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "@/lib/api";
 import type { TaoluItem } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -40,6 +41,22 @@ export default function BrowseView() {
     queryKey: ["status"],
     queryFn: api.status,
     select: (s) => s.groups,
+  });
+
+  const queryClient = useQueryClient();
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["taolus"] });
+    queryClient.invalidateQueries({ queryKey: ["status"] });
+  };
+
+  const archiveMut = useMutation({
+    mutationFn: (name: string) => api.archive(name),
+    onSuccess: invalidate,
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: (name: string) => api.restore(name),
+    onSuccess: invalidate,
   });
 
   return (
@@ -110,6 +127,7 @@ export default function BrowseView() {
                 <TableHead>Version</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Tags</TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -147,6 +165,27 @@ export default function BrowseView() {
                         </Badge>
                       ))}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {t.archived ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={restoreMut.isPending}
+                        onClick={() => restoreMut.mutate(t.name)}
+                      >
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={archiveMut.isPending}
+                        onClick={() => archiveMut.mutate(t.name)}
+                      >
+                        Archive
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

@@ -26,6 +26,8 @@ func NewHandler(vaultPath string) http.Handler {
 	mux.HandleFunc("GET /api/taolus/{name}/history", handleHistory(vaultPath))
 	mux.HandleFunc("GET /api/taolus/{name}/content", handleContent(vaultPath))
 	mux.HandleFunc("GET /api/taolus/{name}/diff", handleDiff(vaultPath))
+	mux.HandleFunc("POST /api/taolus/{name}/archive", handleArchive(vaultPath))
+	mux.HandleFunc("POST /api/taolus/{name}/restore", handleRestore(vaultPath))
 
 	mux.Handle("/", spaHandler())
 
