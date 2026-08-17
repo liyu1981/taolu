@@ -37,7 +37,7 @@ export function SelectContent({
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         className={cn(
-          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl glass-control bg-clip-padding text-popover-foreground shadow-md data-[state=open]:taolu-materialize data-[state=closed]:hidden",
+          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl apple-content bg-clip-padding text-popover-foreground shadow-md data-[state=open]:taolu-materialize data-[state=closed]:hidden",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className,
