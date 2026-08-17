@@ -12,7 +12,7 @@ import { DiffList } from "@/components/diff-view";
 import { Loading, ErrorBox } from "@/components/status";
 
 export default function TaoluDetailView() {
-  const { name } = useParams({ from: "/taolu/$name" });
+  const { name } = useParams({ from: "/browse/$name" });
 
   const detail = useReactQuery({
     queryKey: ["taolu", name],
@@ -31,7 +31,7 @@ export default function TaoluDetailView() {
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <Link to="/taolu" className="text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/browse" className="text-sm text-muted-foreground hover:text-foreground">
             ← Browse
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight mt-1 flex items-center gap-2">

@@ -117,7 +117,7 @@ export default function BrowseView() {
                 <TableRow key={t.name}>
                   <TableCell className="font-medium">
                     <Link
-                      to="/taolu/$name"
+                      to="/browse/$name"
                       params={{ name: t.name }}
                       className="text-primary underline-offset-4 hover:underline"
                     >

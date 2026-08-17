@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import BrowseView from "@/views/BrowseView";
 
-export const Route = createFileRoute("/taolu/")({
+export const Route = createFileRoute("/browse/")({
   component: BrowseView,
 });

@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import StatusView from "@/views/StatusView";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-  component: StatusView,
+  beforeLoad: () => {
+    throw redirect({ to: "/status" });
+  },
 });

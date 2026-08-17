@@ -10,53 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TaoluIndexRouteImport } from './routes/taolu/index'
-import { Route as TaoluNameRouteImport } from './routes/taolu/$name'
+import { Route as StatusRouteImport } from './routes/status'
+import { Route as BrowseIndexRouteImport } from './routes/browse/index'
+import { Route as BrowseNameRouteImport } from './routes/browse/$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TaoluIndexRoute = TaoluIndexRouteImport.update({
-  id: '/taolu/',
-  path: '/taolu/',
+const StatusRoute = StatusRouteImport.update({
+  id: '/status',
+  path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TaoluNameRoute = TaoluNameRouteImport.update({
-  id: '/taolu/$name',
-  path: '/taolu/$name',
+const BrowseIndexRoute = BrowseIndexRouteImport.update({
+  id: '/browse/',
+  path: '/browse/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowseNameRoute = BrowseNameRouteImport.update({
+  id: '/browse/$name',
+  path: '/browse/$name',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/taolu/$name': typeof TaoluNameRoute
-  '/taolu/': typeof TaoluIndexRoute
+  '/status': typeof StatusRoute
+  '/browse/$name': typeof BrowseNameRoute
+  '/browse/': typeof BrowseIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/taolu/$name': typeof TaoluNameRoute
-  '/taolu': typeof TaoluIndexRoute
+  '/status': typeof StatusRoute
+  '/browse/$name': typeof BrowseNameRoute
+  '/browse': typeof BrowseIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/taolu/$name': typeof TaoluNameRoute
-  '/taolu/': typeof TaoluIndexRoute
+  '/status': typeof StatusRoute
+  '/browse/$name': typeof BrowseNameRoute
+  '/browse/': typeof BrowseIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/taolu/$name' | '/taolu/'
+  fullPaths: '/' | '/status' | '/browse/$name' | '/browse/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/taolu/$name' | '/taolu'
-  id: '__root__' | '/' | '/taolu/$name' | '/taolu/'
+  to: '/' | '/status' | '/browse/$name' | '/browse'
+  id: '__root__' | '/' | '/status' | '/browse/$name' | '/browse/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  TaoluNameRoute: typeof TaoluNameRoute
-  TaoluIndexRoute: typeof TaoluIndexRoute
+  StatusRoute: typeof StatusRoute
+  BrowseNameRoute: typeof BrowseNameRoute
+  BrowseIndexRoute: typeof BrowseIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,18 +78,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/taolu/': {
-      id: '/taolu/'
-      path: '/taolu'
-      fullPath: '/taolu/'
-      preLoaderRoute: typeof TaoluIndexRouteImport
+    '/status': {
+      id: '/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/taolu/$name': {
-      id: '/taolu/$name'
-      path: '/taolu/$name'
-      fullPath: '/taolu/$name'
-      preLoaderRoute: typeof TaoluNameRouteImport
+    '/browse/': {
+      id: '/browse/'
+      path: '/browse'
+      fullPath: '/browse/'
+      preLoaderRoute: typeof BrowseIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browse/$name': {
+      id: '/browse/$name'
+      path: '/browse/$name'
+      fullPath: '/browse/$name'
+      preLoaderRoute: typeof BrowseNameRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -87,8 +104,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  TaoluNameRoute: TaoluNameRoute,
-  TaoluIndexRoute: TaoluIndexRoute,
+  StatusRoute: StatusRoute,
+  BrowseNameRoute: BrowseNameRoute,
+  BrowseIndexRoute: BrowseIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

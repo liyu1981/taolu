@@ -9,8 +9,8 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const links = [
-    { to: "/", label: "Status", icon: Database, exact: true },
-    { to: "/taolu", label: "Browse", icon: BookOpen, exact: false },
+    { to: "/status", label: "Status", icon: Database },
+    { to: "/browse", label: "Browse", icon: BookOpen },
   ];
   return (
     <div className="min-h-screen ambient-bg">
@@ -23,11 +23,10 @@ function RootLayout() {
             <span>taolu</span>
           </div>
           <nav className="flex items-center gap-1">
-            {links.map(({ to, label, icon: Icon, exact }) => (
+            {links.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
-                activeOptions={{ exact }}
                 className={cn(
                   "relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-[color] duration-150 hover:text-foreground",
                 )}
