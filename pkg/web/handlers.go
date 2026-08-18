@@ -122,7 +122,7 @@ func handleStatus(vaultPath string) http.HandlerFunc {
 
 		st := Status{
 			ServerName:    serverName,
-			ServerVersion: serverVersion,
+			ServerVersion: serverVersion(),
 			VaultPath:     p,
 			ProjectCode:   projectCode,
 			TaoluCount:    len(taolus),

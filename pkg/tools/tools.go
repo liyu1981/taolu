@@ -10,6 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/yli/taolu/pkg/commands"
 	"github.com/yli/taolu/pkg/vault"
 )
 
@@ -567,5 +568,50 @@ func RegisterTaoluTools(server *mcp.Server) {
 		}
 		return textResult(fmt.Sprintf("renamed %s/%s -> %s/%s\nSKILL.md frontmatter name updated\nversion history continued\nvault: %s",
 			oldGroup, args.Name, newGroup, args.NewName, p)), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_install_commands",
+		Description: "Install taolu slash commands for an agent tool. Creates command files (e.g. /taolu, /taolu-list, /taolu-apply) in the agent's config directory and merges the MCP server connection config.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Tool      string `json:"tool" jsonschema:"agent tool: opencode, claude, or vscode (required)"`
+		Target    string `json:"target,omitempty" jsonschema:"project root directory; defaults to the current directory"`
+		Scope     string `json:"scope,omitempty" jsonschema:"local or global; defaults to local"`
+		Transport string `json:"transport,omitempty" jsonschema:"http or stdio; defaults to http"`
+		Port      int    `json:"port,omitempty" jsonschema:"MCP server port for http mode; defaults to 8264"`
+		RepoPath  string `json:"repo_path,omitempty" jsonschema:"vault path for stdio mode; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+		Force     bool   `json:"force,omitempty" jsonschema:"overwrite existing command files and MCP config"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Tool == "" {
+			return nil, nil, errors.New("tool is required (opencode, claude, or vscode)")
+		}
+		if args.Scope == "" {
+			args.Scope = "local"
+		}
+		if args.Transport == "" {
+			args.Transport = commands.TransportHTTP
+		}
+		opts := commands.InstallOptions{
+			Tool:      args.Tool,
+			Scope:     args.Scope,
+			Transport: args.Transport,
+			Target:    args.Target,
+			Port:      args.Port,
+			RepoPath:  args.RepoPath,
+			Force:     args.Force,
+		}
+		written, err := commands.Install(opts)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(written) == 0 {
+			return textResult("already up to date; no files changed"), nil, nil
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "installed %d file(s) for %s (%s):\n", len(written), args.Tool, args.Scope)
+		for _, f := range written {
+			fmt.Fprintf(&b, "  %s\n", f)
+		}
+		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
 	})
 }

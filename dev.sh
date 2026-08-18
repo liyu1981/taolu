@@ -24,4 +24,4 @@ else
   echo "warning: web/node_modules missing; run 'cd web && pnpm install' to build the UI" >&2
 fi
 
-exec go run ./cmd/taolu
+exec go run ./cmd/taolu serve

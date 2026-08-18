@@ -63,10 +63,12 @@ so multiple opencode instances connect to one process — the vault is touched b
 a single process and there is no SQLite lock contention.
 
 ```sh
-./taolu                     # starts both MCP server (:8264) and web UI (:8265)
-./taolu --mcp-only          # starts only the MCP server (no web UI)
-./taolu --web-only          # starts only the web UI (no MCP server)
-./taolu --stdio             # instead: single-process stdio mode
+./taolu serve                       # starts both MCP server (:8264) and web UI (:8265)
+./taolu serve --with=httpmcp        # starts only the MCP server (no web UI)
+./taolu serve --with=web            # starts only the web UI (no MCP server)
+./taolu serve --with=stdio          # stdio mode (for single-process agent integration)
+./taolu install                     # install slash commands interactively (TUI)
+./taolu install --tool opencode     # install commands for opencode (non-interactive)
 ```
 
 The web UI is a read-only browser for the vault (system status, taolu browser,
@@ -123,7 +125,7 @@ Start the server once, then point every opencode instance at it:
   "mcp": {
     "taolu": {
       "type": "local",
-      "command": ["go", "run", "./cmd/taolu", "--stdio"],
+      "command": ["taolu", "serve", "--with=stdio"],
       "environment": {
         "TAOLU_REPO": "/home/you/.taolu/vault.fossil"
       }
@@ -138,8 +140,8 @@ Start the server once, then point every opencode instance at it:
 {
   "mcpServers": {
     "taolu": {
-      "command": "go",
-      "args": ["run", "./cmd/taolu", "--stdio"]
+      "command": "taolu",
+      "args": ["serve", "--with=stdio"]
     }
   }
 }

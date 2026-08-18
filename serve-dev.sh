@@ -68,7 +68,7 @@ start() {
   build
   rotate
   nohup env TAOLU_REPO="$TAOLU_REPO" TAOLU_HOST="$TAOLU_HOST" TAOLU_PORT="$TAOLU_PORT" \
-    "$BIN" >>"$LOG" 2>&1 &
+    "$BIN" serve >>"$LOG" 2>&1 &
   echo $! >"$PID"
   echo "started (pid $!) -> http://${TAOLU_HOST}:${TAOLU_PORT}"
   echo "vault: $TAOLU_REPO  log: $LOG"
