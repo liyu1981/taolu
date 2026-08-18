@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery as useReactQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ModeBadge } from "@/components/mode-badge";
 import { CodeBlock } from "@/components/code-block";
+import { FileTree } from "@/components/file-tree";
 import { DiffList } from "@/components/diff-view";
 import { Loading, ErrorBox } from "@/components/status";
 
@@ -191,6 +192,7 @@ function ContentTab({
   historyLoading: boolean;
 }) {
   const [version, setVersion] = useState("tip");
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const content = useReactQuery({
     queryKey: ["content", name, version],
     queryFn: () => api.content(name, version === "tip" ? undefined : version),
@@ -199,12 +201,27 @@ function ContentTab({
 
   const versions = [...(history ?? [])].reverse();
 
+  const files = content.data?.files ?? [];
+
+  // Auto-select first file when content loads or version changes
+  const effectiveSelected = useMemo(() => {
+    if (selectedFile && files.some((f: ContentFile) => f.path === selectedFile)) {
+      return selectedFile;
+    }
+    return files.length > 0 ? files[0].path : null;
+  }, [selectedFile, files]);
+
+  const selectedContent = useMemo(() => {
+    if (!effectiveSelected) return null;
+    return files.find((f: ContentFile) => f.path === effectiveSelected) ?? null;
+  }, [effectiveSelected, files]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">Version</span>
         {!historyLoading && versions.length > 0 ? (
-          <Select value={version} onValueChange={setVersion}>
+          <Select value={version} onValueChange={(v) => { setVersion(v); setSelectedFile(null); }}>
             <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
@@ -224,11 +241,27 @@ function ContentTab({
 
       {content.isLoading && <Loading label="Loading content…" />}
       {content.error && <ErrorBox error={content.error} />}
-      {content.data && (
-        <div className="space-y-4">
-          {content.data.files.map((f: ContentFile) => (
-            <CodeBlock key={f.path} filename={f.path} content={f.content} />
-          ))}
+      {content.data && files.length > 0 && (
+        <div className="flex gap-3 min-h-[400px]">
+          {/* Left panel: file tree */}
+          <div className="w-56 shrink-0">
+            <FileTree
+              files={files}
+              selected={effectiveSelected ?? ""}
+              onSelect={setSelectedFile}
+            />
+          </div>
+
+          {/* Right panel: file content */}
+          <div className="flex-1 min-w-0">
+            {selectedContent ? (
+              <CodeBlock filename={selectedContent.path} content={selectedContent.content} />
+            ) : (
+              <div className="rounded-xl glass-control bg-clip-padding p-8 text-center text-sm text-muted-foreground">
+                Select a file to view its content.
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
