@@ -1,0 +1,32 @@
+# Air configuration for taolu development.
+# See https://github.com/air-verse/air for options.
+
+root = "."
+tmp_dir = "var/air"
+
+[build]
+  bin = "./var/air/taolu"
+  full_bin = "./var/air/taolu serve"
+  cmd = "go build -o ./var/air/taolu ./cmd/taolu"
+  delay = 1000
+  exclude_dir = ["var", "web/node_modules", "web/dist", ".git", "plan"]
+  exclude_regex = ["_test\\.go$"]
+  include_ext = ["go"]
+  kill_delay = "1s"
+  send_interrupt = false
+  stop_on_error = true
+
+[color]
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true
+
+[screen]
+  clear_on_rebuild = false

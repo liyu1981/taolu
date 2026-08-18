@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the taolu dev MCP server in the foreground.
+# Start the taolu dev MCP server with live reload via air.
 #
 # Env overrides (optional):
 #   TAOLU_HOST  bind host     (default 127.0.0.1)
@@ -16,7 +16,7 @@ mkdir -p var
 echo "taolu dev server -> http://${TAOLU_HOST}:${TAOLU_PORT}  vault=${TAOLU_REPO}"
 
 # Build the embedded web UI if its dependencies are installed. The Go binary
-# embeds pkg/web/dist via //go:embed, so it must exist before go run.
+# embeds pkg/web/dist via //go:embed, so it must exist before air builds.
 if [[ -d web/node_modules ]]; then
   echo "building web assets -> pkg/web/dist"
   (cd web && pnpm build)
@@ -24,4 +24,10 @@ else
   echo "warning: web/node_modules missing; run 'cd web && pnpm install' to build the UI" >&2
 fi
 
-exec go run ./cmd/taolu serve
+# Ensure air is available.
+if ! command -v air &>/dev/null; then
+  echo "installing air..." >&2
+  go install github.com/air-verse/air@latest
+fi
+
+exec air

@@ -11,20 +11,22 @@ import (
 	libfossil "github.com/danmestas/go-libfossil"
 	"gopkg.in/yaml.v3"
 
+	"github.com/yli/taolu/pkg/commands"
 	"github.com/yli/taolu/pkg/vault"
 )
 
 // Status is the response for GET /api/status.
 type Status struct {
-	ServerName    string   `json:"server_name"`
-	ServerVersion string   `json:"server_version"`
-	VaultPath     string   `json:"vault_path"`
-	ProjectCode   string   `json:"project_code"`
-	TaoluCount    int      `json:"taolu_count"`
-	ArchivedCount int      `json:"archived_count"`
-	Groups        []string `json:"groups"`
-	Authoring     string   `json:"authoring"`
-	Uptime        string   `json:"uptime"`
+	ServerName    string                        `json:"server_name"`
+	ServerVersion string                        `json:"server_version"`
+	VaultPath     string                        `json:"vault_path"`
+	ProjectCode   string                        `json:"project_code"`
+	TaoluCount    int                           `json:"taolu_count"`
+	ArchivedCount int                           `json:"archived_count"`
+	Groups        []string                      `json:"groups"`
+	Authoring     string                        `json:"authoring"`
+	Uptime        string                        `json:"uptime"`
+	Installed     map[string]commands.InstalledInfo `json:"installed"`
 }
 
 // TaoluItem is a listing row for GET /api/taolus.
@@ -129,6 +131,7 @@ func handleStatus(vaultPath string) http.HandlerFunc {
 			ArchivedCount: len(archived),
 			Groups:        sortedGroups(taolus),
 			Uptime:        time.Since(startTime).Round(time.Second).String(),
+			Installed:     commands.CheckInstalledGlobal(),
 		}
 		for _, t := range taolus {
 			if t.Name == vault.SeedName {

@@ -17,6 +17,12 @@ type Tool struct {
 	MCPKey      string // top-level JSON key for MCP servers
 }
 
+// InstalledInfo describes whether taolu commands are installed for a tool.
+type InstalledInfo struct {
+	Installed bool   `json:"installed"`
+	Path      string `json:"path"`
+}
+
 // Tools is the list of supported agent tools.
 var Tools = []Tool{
 	{
@@ -282,4 +288,45 @@ func mergeMCPConfig(path, mcpKey, serverName string, serverConfig any) (bool, er
 	}
 
 	return true, nil
+}
+
+// CheckInstalledGlobal checks whether taolu commands are installed globally
+// for each supported agent tool. Returns a map of tool ID to install status.
+func CheckInstalledGlobal() map[string]InstalledInfo {
+	result := make(map[string]InstalledInfo, len(Tools))
+	for _, t := range Tools {
+		dir, err := globalConfigDir(&t)
+		if err != nil {
+			result[t.ID] = InstalledInfo{Installed: false}
+			continue
+		}
+		cmdDir := filepath.Join(dir, t.CommandsDir)
+		result[t.ID] = checkCommandFiles(t.ID, cmdDir)
+	}
+	return result
+}
+
+// checkCommandFiles checks if the command .md files exist in the given directory.
+func checkCommandFiles(toolID, dir string) InstalledInfo {
+	info := InstalledInfo{Path: dir}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return info
+	}
+	// Count how many expected command files exist.
+	needed := len(CommandNames)
+	found := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		for _, name := range CommandNames {
+			if e.Name() == name+".md" {
+				found++
+				break
+			}
+		}
+	}
+	info.Installed = found == needed
+	return info
 }

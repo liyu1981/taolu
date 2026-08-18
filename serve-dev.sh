@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Manage the taolu dev MCP server as a background process with rotated logs
-# under ./var.
+# Start the taolu dev server with live reload via air.
 #
-# Usage: ./serve-dev.sh {start|stop|restart|status|logs|build}
+# Usage: ./serve-dev.sh {start|stop|restart|status|logs|build|web}
 #
 # Env overrides (optional):
 #   TAOLU_HOST      bind host        (default 127.0.0.1)
@@ -20,7 +19,6 @@ export TAOLU_PORT="${TAOLU_PORT:-8264}"
 MAX_LOG_BYTES="${MAX_LOG_BYTES:-5242880}"
 
 VAR=./var
-BIN="$VAR/taolu"
 LOG="$VAR/taolu.log"
 PID="$VAR/taolu.pid"
 
@@ -41,15 +39,13 @@ rotate() {
   echo "rotated $LOG -> $LOG.1"
 }
 
-build() {
-  mkdir -p "$VAR"
-  web_build
-  echo "building -> $BIN"
-  go build -o "$BIN" ./cmd/taolu
+ensure_air() {
+  if ! command -v air &>/dev/null; then
+    echo "installing air..." >&2
+    go install github.com/air-verse/air@latest
+  fi
 }
 
-# web_build produces the embedded frontend bundle (pnpm). Required before go
-# build, which embeds pkg/web/dist via //go:embed.
 web_build() {
   if [[ -d web/node_modules ]]; then
     echo "building web assets -> pkg/web/dist"
@@ -65,12 +61,12 @@ start() {
     echo "already running (pid $(cat "$PID"))"
     return 0
   fi
-  build
+  ensure_air
+  web_build
   rotate
-  nohup env TAOLU_REPO="$TAOLU_REPO" TAOLU_HOST="$TAOLU_HOST" TAOLU_PORT="$TAOLU_PORT" \
-    "$BIN" serve >>"$LOG" 2>&1 &
+  nohup air >>"$LOG" 2>&1 &
   echo $! >"$PID"
-  echo "started (pid $!) -> http://${TAOLU_HOST}:${TAOLU_PORT}"
+  echo "started (pid $!) -> http://${TAOLU_HOST}:${TAOLU_PORT}  (live reload)"
   echo "vault: $TAOLU_REPO  log: $LOG"
 }
 
@@ -110,7 +106,7 @@ case "$CMD" in
   restart) stop; start ;;
   status)  status ;;
   logs)    tail -f "$LOG" ;;
-  build)   build ;;
+  build)   web_build ;;
   web)     web_build ;;
   *)       echo "usage: $0 {start|stop|restart|status|logs|build|web}"; exit 2 ;;
 esac

@@ -1,3 +1,8 @@
+export interface InstalledInfo {
+  installed: boolean;
+  path: string;
+}
+
 export interface Status {
   server_name: string;
   server_version: string;
@@ -8,6 +13,7 @@ export interface Status {
   groups: string[];
   authoring: string;
   uptime: string;
+  installed: Record<string, InstalledInfo>;
 }
 
 export interface TaoluItem {
