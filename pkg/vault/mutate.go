@@ -186,11 +186,18 @@ func RenameTaolu(r *libfossil.Repo, name, newName, newGroup, message, user strin
 		return "", "", err
 	}
 
+	// Get the domain from the old path
+	oldRef, ok := ParseTaoluPath(sp)
+	if !ok {
+		return "", "", fmt.Errorf("failed to parse old taolu path %q", sp)
+	}
+	domain := oldRef.Domain
+
 	tree, err := tipTree(r)
 	if err != nil {
 		return "", "", err
 	}
-	oldPrefix := filepath.Join(taoluRoot, oldGroup, name) + string(filepath.Separator)
+	oldPrefix := filepath.Join(taoluRoot, domain, oldGroup, name) + string(filepath.Separator)
 	remaining := make([]libfossil.FileToCommit, 0, len(tree)+3)
 	for _, f := range tree {
 		if !strings.HasPrefix(f.Name, oldPrefix) {
@@ -204,16 +211,16 @@ func RenameTaolu(r *libfossil.Repo, name, newName, newGroup, message, user strin
 			continue
 		}
 		remaining = append(remaining, libfossil.FileToCommit{
-			Name:    filepath.Join(taoluRoot, newGroup, newName, rel),
+			Name:    filepath.Join(taoluRoot, domain, newGroup, newName, rel),
 			Content: f.Content,
 			Perm:    f.Perm,
 		})
 	}
 	remaining = append(remaining,
-		libfossil.FileToCommit{Name: skillPath(newGroup, newName), Content: []byte(renamed)},
-		libfossil.FileToCommit{Name: actionPath(newGroup, newName), Content: []byte(action)},
-		libfossil.FileToCommit{Name: filepath.Join(taoluRoot, newGroup, newName, originMarker),
-			Content: []byte(filepath.Join(oldGroup, name))},
+		libfossil.FileToCommit{Name: skillPathDomain(domain, newGroup, newName), Content: []byte(renamed)},
+		libfossil.FileToCommit{Name: actionPathDomain(domain, newGroup, newName), Content: []byte(action)},
+		libfossil.FileToCommit{Name: filepath.Join(taoluRoot, domain, newGroup, newName, originMarker),
+			Content: []byte(filepath.Join(domain, oldGroup, name))},
 	)
 
 	hist, err := SkillHistory(r, sp)

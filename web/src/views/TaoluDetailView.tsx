@@ -55,11 +55,13 @@ export default function TaoluDetailView() {
             ← Browse
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight mt-1 flex items-center gap-2">
-            {detail.data.name}
+            <span className="text-muted-foreground">{detail.data.domain}/</span>
+            <span className="text-muted-foreground">{detail.data.group}/</span>
+            <span>{detail.data.name}</span>
             {detail.data.archived && <Badge variant="destructive">archived</Badge>}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {detail.data.group} · <ModeBadge mode={detail.data.mode} /> · latest{" "}
+            <ModeBadge mode={detail.data.mode} /> · latest{" "}
             <span className="font-mono">{detail.data.latest_version || "—"}</span> ·{" "}
             {detail.data.version_count} version{detail.data.version_count === 1 ? "" : "s"}
           </p>

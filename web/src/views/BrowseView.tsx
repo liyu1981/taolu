@@ -23,15 +23,17 @@ const MODES = ["apply", "install", "enforce"] as const;
 export default function BrowseView() {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("all");
+  const [domain, setDomain] = useState("all");
   const [mode, setMode] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["taolus", query, group, mode, showArchived],
+    queryKey: ["taolus", query, group, domain, mode, showArchived],
     queryFn: () =>
       api.taolus({
         query: query || undefined,
         group: group === "all" ? undefined : group,
+        domain: domain === "all" ? undefined : domain,
         include: mode === "all" ? undefined : mode,
         archived: showArchived,
       }),
@@ -41,6 +43,12 @@ export default function BrowseView() {
     queryKey: ["status"],
     queryFn: api.status,
     select: (s) => s.groups,
+  });
+
+  const domains = useQuery({
+    queryKey: ["status"],
+    queryFn: api.status,
+    select: (s) => s.domains,
   });
 
   const queryClient = useQueryClient();
@@ -76,6 +84,19 @@ export default function BrowseView() {
           placeholder="Search name / description / tags…"
           className="h-9 w-64 rounded-lg glass-control bg-clip-padding px-3 text-sm text-popover-foreground placeholder:text-muted-foreground shadow-sm transition-[filter] duration-150 hover:brightness-[1.04] focus:outline-none focus:ring-1 focus:ring-ring"
         />
+        <Select value={domain} onValueChange={setDomain}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Domain" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All domains</SelectItem>
+            {(domains.data ?? []).map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={group} onValueChange={setGroup}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Group" />
@@ -121,8 +142,7 @@ export default function BrowseView() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Group</TableHead>
+                <TableHead>ID</TableHead>
                 <TableHead>Mode</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>Description</TableHead>
@@ -132,14 +152,16 @@ export default function BrowseView() {
             </TableHeader>
             <TableBody>
               {data.map((t: TaoluItem) => (
-                <TableRow key={t.name}>
+                <TableRow key={`${t.domain}/${t.group}/${t.name}`}>
                   <TableCell className="font-medium">
                     <Link
                       to="/browse/$name"
                       params={{ name: t.name }}
                       className="text-primary underline-offset-4 hover:underline"
                     >
-                      {t.name}
+                      <span className="text-muted-foreground">{t.domain}/</span>
+                      <span className="text-muted-foreground">{t.group}/</span>
+                      <span>{t.name}</span>
                     </Link>
                     {t.archived && (
                       <Badge variant="destructive" className="ml-2">
@@ -147,7 +169,6 @@ export default function BrowseView() {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell>{t.group}</TableCell>
                   <TableCell>
                     <ModeBadge mode={t.mode} />
                   </TableCell>

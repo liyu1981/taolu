@@ -13,21 +13,29 @@ import (
 // assets argument is authoritative: assets from the previous version that are
 // not listed are dropped rather than carried forward.
 func SaveTaolu(r *libfossil.Repo, group, name, skill, action string, assets []Asset, message, user, versionLabel string) (label, uuid string, total int, err error) {
+	return SaveTaoluWithDomain(r, DomainPrefix, group, name, skill, action, assets, message, user, versionLabel)
+}
+
+// SaveTaoluWithDomain commits skill, action, and any files/ assets as a new version of
+// the taolu in the specified domain. This is the preferred function for new code.
+func SaveTaoluWithDomain(r *libfossil.Repo, domain, group, name, skill, action string, assets []Asset, message, user, versionLabel string) (label, uuid string, total int, err error) {
 	if user == "" {
 		user = "admin"
 	}
 	if err := ValidateAssets(assets); err != nil {
 		return "", "", 0, err
 	}
-	sp := skillPath(group, name)
-	ap := actionPath(group, name)
+	ref := TaoluRef{Domain: domain, Group: group, Name: name}
+	sp := ref.Path()
+	ap := ref.ActionPath()
 	existing, err := FindSkillPath(r, name)
 	if err != nil {
 		return "", "", 0, err
 	}
 	if existing != "" && existing != sp {
-		return "", "", 0, fmt.Errorf("taolu %q already exists under group %q (path %s); refusing to save under %q",
-			name, skillGroup(existing), existing, group)
+		existingRef, _ := ParseTaoluPath(existing)
+		return "", "", 0, fmt.Errorf("taolu %q already exists under domain %q group %q (path %s); refusing to save under %q",
+			name, existingRef.Domain, existingRef.Group, existing, ref.Domain)
 	}
 
 	hist, err := SkillHistory(r, sp)
@@ -68,7 +76,7 @@ func SaveTaolu(r *libfossil.Repo, group, name, skill, action string, assets []As
 	)
 	for _, a := range assets {
 		files = append(files, libfossil.FileToCommit{
-			Name:    assetPath(group, name, a.Path),
+			Name:    ref.AssetPath(a.Path),
 			Content: []byte(a.Content),
 		})
 	}

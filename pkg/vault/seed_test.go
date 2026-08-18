@@ -19,7 +19,8 @@ func TestEnsureAuthoringGuideSeeds(t *testing.T) {
 		t.Fatalf("EnsureAuthoringGuide: %v", err)
 	}
 	sp := mustFindSkill(t, r, SeedName)
-	if sp != "taolus/meta/taolu-authoring/SKILL.md" {
+	// New 3-layer format with @local domain
+	if sp != "taolus/@local/meta/taolu-authoring/SKILL.md" {
 		t.Errorf("seed path = %q", sp)
 	}
 

@@ -141,8 +141,14 @@ func TestParseSkillPath(t *testing.T) {
 		name      string
 		wantOK    bool
 	}{
+		// 3-layer format (new)
+		{"taolus/@local/workflows/go-lint/SKILL.md", "workflows", "go-lint", true},
+		{"taolus/@local/backend/api/SKILL.md", "backend", "api", true},
+		{"taolus/@liyu1981/frontend/app/SKILL.md", "frontend", "app", true},
+		// 2-layer format (legacy, treated as @local)
 		{"taolus/workflows/go-lint/SKILL.md", "workflows", "go-lint", true},
 		{"taolus/backend/api/SKILL.md", "backend", "api", true},
+		// Invalid paths
 		{"taolus/workflows/go-lint/ACTION.md", "", "", false},
 		{"taolus/workflows/go-lint/notes.md", "", "", false},
 		{"practices/workflows/legacy/SKILL.md", "", "", false},
@@ -161,6 +167,11 @@ func TestParseSkillPath(t *testing.T) {
 }
 
 func TestSkillGroup(t *testing.T) {
+	// 3-layer format (new)
+	if g := skillGroup("taolus/@local/backend/api/SKILL.md"); g != "backend" {
+		t.Errorf("skillGroup = %q, want backend", g)
+	}
+	// 2-layer format (legacy, treated as @local)
 	if g := skillGroup("taolus/backend/api/SKILL.md"); g != "backend" {
 		t.Errorf("skillGroup = %q, want backend", g)
 	}

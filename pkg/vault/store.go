@@ -17,6 +17,7 @@ import (
 type TaoluInfo struct {
 	Name          string
 	Group         string
+	Domain        string
 	Mode          string
 	Description   string
 	Tags          string
@@ -124,6 +125,79 @@ func FindSkillPath(r *libfossil.Repo, name string) (string, error) {
 	return "", nil
 }
 
+// FindSkillPathByRef returns the vault path of the taolu's SKILL.md for a given reference.
+// If ref.Domain is empty, it searches all domains for the given group/name.
+func FindSkillPathByRef(r *libfossil.Repo, ref TaoluRef) (string, error) {
+	rid, err := r.ResolveVersion("tip")
+	if errors.Is(err, libfossil.ErrVersionNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	files, err := r.ListFiles(rid)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range files {
+		if !strings.HasPrefix(f.Name, taoluRoot+string(filepath.Separator)) {
+			continue
+		}
+		if filepath.Base(f.Name) != "SKILL.md" {
+			continue
+		}
+		fileRef, ok := ParseTaoluPath(f.Name)
+		if !ok {
+			continue
+		}
+		if ref.Domain != "" && fileRef.Domain != ref.Domain {
+			continue
+		}
+		if ref.Group != "" && fileRef.Group != ref.Group {
+			continue
+		}
+		if fileRef.Name == ref.Name {
+			return f.Name, nil
+		}
+	}
+	return "", nil
+}
+
+// FindSkillPathByRefResolved returns the vault path of the taolu's SKILL.md for a given reference.
+// The reference must have a domain specified (use ResolveTaoluRef first).
+func FindSkillPathByRefResolved(r *libfossil.Repo, ref TaoluRef) (string, error) {
+	if ref.Domain == "" {
+		return "", fmt.Errorf("domain must be specified in taolu reference")
+	}
+	rid, err := r.ResolveVersion("tip")
+	if errors.Is(err, libfossil.ErrVersionNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	files, err := r.ListFiles(rid)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range files {
+		if !strings.HasPrefix(f.Name, taoluRoot+string(filepath.Separator)) {
+			continue
+		}
+		if filepath.Base(f.Name) != "SKILL.md" {
+			continue
+		}
+		fileRef, ok := ParseTaoluPath(f.Name)
+		if !ok {
+			continue
+		}
+		if fileRef.Domain == ref.Domain && fileRef.Group == ref.Group && fileRef.Name == ref.Name {
+			return f.Name, nil
+		}
+	}
+	return "", nil
+}
+
 // IsArchived reports whether the taolu at skillPath is archived (has an
 // .archived marker file at tip).
 func IsArchived(r *libfossil.Repo, skillPath string) (bool, error) {
@@ -148,6 +222,11 @@ func ListArchivedTaolu(r *libfossil.Repo) ([]TaoluInfo, error) {
 }
 
 func listTaolu(r *libfossil.Repo, wantArchived bool) ([]TaoluInfo, error) {
+	return listTaoluWithDomain(r, wantArchived, "")
+}
+
+// listTaoluWithDomain enumerates taolus, optionally filtering by domain.
+func listTaoluWithDomain(r *libfossil.Repo, wantArchived bool, domainFilter string) ([]TaoluInfo, error) {
 	rid, err := r.ResolveVersion("tip")
 	if errors.Is(err, libfossil.ErrVersionNotFound) {
 		return nil, nil
@@ -161,8 +240,12 @@ func listTaolu(r *libfossil.Repo, wantArchived bool) ([]TaoluInfo, error) {
 	}
 	var out []TaoluInfo
 	for _, f := range files {
-		group, name, ok := parseSkillPath(f.Name)
+		ref, ok := parseSkillPathFull(f.Name)
 		if !ok {
+			continue
+		}
+		// Apply domain filter if specified
+		if domainFilter != "" && ref.Domain != domainFilter {
 			continue
 		}
 		archived, err := IsArchived(r, f.Name)
@@ -191,8 +274,9 @@ func listTaolu(r *libfossil.Repo, wantArchived bool) ([]TaoluInfo, error) {
 			return nil, err
 		}
 		info := TaoluInfo{
-			Name:        name,
-			Group:       group,
+			Name:        ref.Name,
+			Group:       ref.Group,
+			Domain:      ref.Domain,
 			Mode:        mode,
 			Description: meta.Description,
 			Tags:        meta.Metadata["tags"],
@@ -213,6 +297,35 @@ func UniqueGroups(skills []TaoluInfo) []string {
 	seen := map[string]bool{}
 	var groups []string
 	for _, s := range skills {
+		if !seen[s.Group] {
+			seen[s.Group] = true
+			groups = append(groups, s.Group)
+		}
+	}
+	return groups
+}
+
+// UniqueDomains returns the distinct domains in taolus, in first-seen order.
+func UniqueDomains(skills []TaoluInfo) []string {
+	seen := map[string]bool{}
+	var domains []string
+	for _, s := range skills {
+		if !seen[s.Domain] {
+			seen[s.Domain] = true
+			domains = append(domains, s.Domain)
+		}
+	}
+	return domains
+}
+
+// UniqueGroupsInDomain returns the distinct groups in a specific domain, in first-seen order.
+func UniqueGroupsInDomain(skills []TaoluInfo, domain string) []string {
+	seen := map[string]bool{}
+	var groups []string
+	for _, s := range skills {
+		if s.Domain != domain {
+			continue
+		}
 		if !seen[s.Group] {
 			seen[s.Group] = true
 			groups = append(groups, s.Group)
@@ -243,6 +356,35 @@ func ReadTaoluBundle(r *libfossil.Repo, name, version string) (skill, action str
 	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(vpath), "ACTION.md"))
 	if err != nil {
 		return "", "", nil, fmt.Errorf("taolu %q has no ACTION.md at version %q", name, version)
+	}
+	assets, err = readAssetsAt(r, uuid, filepath.Dir(vpath))
+	if err != nil {
+		return "", "", nil, err
+	}
+	return string(skillData), string(actionData), assets, nil
+}
+
+// ReadTaoluBundleByRef returns the SKILL.md, ACTION.md, and files/ assets of a taolu
+// at a version using a TaoluRef. This is the preferred function for new code.
+func ReadTaoluBundleByRef(r *libfossil.Repo, ref TaoluRef, version string) (skill, action string, assets []Asset, err error) {
+	path, err := FindSkillPathByRefResolved(r, ref)
+	if err != nil {
+		return "", "", nil, err
+	}
+	if path == "" {
+		return "", "", nil, fmt.Errorf("taolu %q not found in vault", ref.String())
+	}
+	uuid, vpath, err := resolveSkillVersion(r, path, version)
+	if err != nil {
+		return "", "", nil, err
+	}
+	skillData, err := r.ReadFileAt(uuid, vpath)
+	if err != nil {
+		return "", "", nil, err
+	}
+	actionData, err := r.ReadFileAt(uuid, filepath.Join(filepath.Dir(vpath), "ACTION.md"))
+	if err != nil {
+		return "", "", nil, fmt.Errorf("taolu %q has no ACTION.md at version %q", ref.String(), version)
 	}
 	assets, err = readAssetsAt(r, uuid, filepath.Dir(vpath))
 	if err != nil {
@@ -436,11 +578,20 @@ func sameFileSet(a, b map[string]string) bool {
 }
 
 // originPathToSkill converts an origin directory under taolus/ (e.g.
-// "workflows/go-lint") to the SKILL.md path of its taolu, or "" if empty.
+// "workflows/go-lint" or "@local/workflows/go-lint") to the SKILL.md path
+// of its taolu, or "" if empty.
 func originPathToSkill(origin string) string {
 	if origin == "" {
 		return ""
 	}
+	// Handle 3-layer format: @domain/group/name
+	if strings.HasPrefix(origin, "@") {
+		parts := strings.Split(origin, "/")
+		if len(parts) == 3 {
+			return filepath.Join(taoluRoot, parts[0], parts[1], parts[2], "SKILL.md")
+		}
+	}
+	// Handle legacy 2-layer format: group/name
 	return filepath.Join(taoluRoot, origin, "SKILL.md")
 }
 

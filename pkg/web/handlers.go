@@ -24,6 +24,8 @@ type Status struct {
 	TaoluCount    int                           `json:"taolu_count"`
 	ArchivedCount int                           `json:"archived_count"`
 	Groups        []string                      `json:"groups"`
+	Domains       []string                      `json:"domains"`
+	UserDomain    string                        `json:"user_domain"`
 	Authoring     string                        `json:"authoring"`
 	Uptime        string                        `json:"uptime"`
 	Installed     map[string]commands.InstalledInfo `json:"installed"`
@@ -33,6 +35,7 @@ type Status struct {
 type TaoluItem struct {
 	Name          string   `json:"name"`
 	Group         string   `json:"group"`
+	Domain        string   `json:"domain"`
 	Mode          string   `json:"mode"`
 	Description   string   `json:"description"`
 	Tags          []string `json:"tags"`
@@ -49,6 +52,7 @@ type AssetMeta struct {
 type TaoluDetail struct {
 	Name       string      `json:"name"`
 	Group      string      `json:"group"`
+	Domain     string      `json:"domain"`
 	Mode       string      `json:"mode"`
 	Archived   bool        `json:"archived"`
 	Skill      string      `json:"skill"`
@@ -121,6 +125,7 @@ func handleStatus(vaultPath string) http.HandlerFunc {
 			apiError(w, http.StatusInternalServerError, "list archived: "+err.Error())
 			return
 		}
+		userDomain, _ := vault.GetUserDomain(repo)
 
 		st := Status{
 			ServerName:    serverName,
@@ -130,6 +135,8 @@ func handleStatus(vaultPath string) http.HandlerFunc {
 			TaoluCount:    len(taolus),
 			ArchivedCount: len(archived),
 			Groups:        sortedGroups(taolus),
+			Domains:       sortedDomains(taolus),
+			UserDomain:    userDomain,
 			Uptime:        time.Since(startTime).Round(time.Second).String(),
 			Installed:     commands.CheckInstalledGlobal(),
 		}
@@ -148,6 +155,7 @@ func handleTaolus(vaultPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := strings.ToLower(r.URL.Query().Get("query"))
 		group := r.URL.Query().Get("group")
+		domain := r.URL.Query().Get("domain")
 		include := r.URL.Query().Get("include")
 		tag := r.URL.Query().Get("tag")
 		showArchived := r.URL.Query().Get("archived") == "true"
@@ -186,6 +194,9 @@ func handleTaolus(vaultPath string) http.HandlerFunc {
 				if group != "" && t.Group != group {
 					continue
 				}
+				if domain != "" && t.Domain != domain {
+					continue
+				}
 				if len(wanted) > 0 && !wanted[t.Mode] {
 					continue
 				}
@@ -203,6 +214,7 @@ func handleTaolus(vaultPath string) http.HandlerFunc {
 				items = append(items, TaoluItem{
 					Name:          t.Name,
 					Group:         t.Group,
+					Domain:        t.Domain,
 					Mode:          t.Mode,
 					Description:   t.Description,
 					Tags:          splitTags(t.Tags),
@@ -223,10 +235,13 @@ func handleTaolus(vaultPath string) http.HandlerFunc {
 		}
 
 		sort.Slice(items, func(i, j int) bool {
-			if items[i].Group == items[j].Group {
-				return items[i].Name < items[j].Name
+			if items[i].Domain == items[j].Domain {
+				if items[i].Group == items[j].Group {
+					return items[i].Name < items[j].Name
+				}
+				return items[i].Group < items[j].Group
 			}
-			return items[i].Group < items[j].Group
+			return items[i].Domain < items[j].Domain
 		})
 
 		if items == nil {
@@ -271,6 +286,7 @@ func handleTaolu(vaultPath string) http.HandlerFunc {
 		d := TaoluDetail{
 			Name:      name,
 			Group:     groupFor(repo, name),
+			Domain:    domainFor(repo, name),
 			Mode:      mode,
 			Archived:  archived,
 			Skill:     skill,
@@ -441,6 +457,12 @@ func sortedGroups(taolus []vault.TaoluInfo) []string {
 	return g
 }
 
+func sortedDomains(taolus []vault.TaoluInfo) []string {
+	d := vault.UniqueDomains(taolus)
+	sort.Strings(d)
+	return d
+}
+
 func splitTags(tags string) []string {
 	if strings.TrimSpace(tags) == "" {
 		return []string{}
@@ -492,6 +514,21 @@ func groupFor(r *libfossil.Repo, name string) string {
 		return parts[1]
 	}
 	return ""
+}
+
+func domainFor(r *libfossil.Repo, name string) string {
+	sp := mustSkillPath(r, name)
+	if sp == "" {
+		return ""
+	}
+	parts := strings.Split(sp, "/")
+	if len(parts) >= 3 {
+		domain := parts[1]
+		if strings.HasPrefix(domain, "@") {
+			return domain
+		}
+	}
+	return vault.DomainPrefix
 }
 
 func modeFor(r *libfossil.Repo, name string) string {

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -18,7 +19,7 @@ import (
 func RegisterTaoluTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_info",
-		Description: "Show information about the practice vault: path, project-code, taolu count, groups, and the latest taolu-authoring version.",
+		Description: "Show information about the practice vault: path, project-code, taolu count, groups, domains, and the latest taolu-authoring version.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 	}) (*mcp.CallToolResult, any, error) {
@@ -37,6 +38,8 @@ func RegisterTaoluTools(server *mcp.Server) {
 		}
 		groups := vault.UniqueGroups(taolus)
 		sort.Strings(groups)
+		domains := vault.UniqueDomains(taolus)
+		sort.Strings(domains)
 		authoring := "not seeded"
 		for _, t := range taolus {
 			if t.Name == vault.SeedName {
@@ -44,11 +47,12 @@ func RegisterTaoluTools(server *mcp.Server) {
 				break
 			}
 		}
+		userDomain, _ := vault.GetUserDomain(r)
 		var b strings.Builder
-		fmt.Fprintf(&b, "vault: %s\nproject-code: %s\ntaolus: %d\ngroups: %s\ntaolu-authoring: %s\n",
-			p, projectCode, len(taolus), strings.Join(groups, ", "), authoring)
+		fmt.Fprintf(&b, "vault: %s\nproject-code: %s\ntaolus: %d\ngroups: %s\ndomains: %s\nuser-domain: %s\ntaolu-authoring: %s\n",
+			p, projectCode, len(taolus), strings.Join(groups, ", "), strings.Join(domains, ", "), userDomain, authoring)
 		for _, t := range taolus {
-			fmt.Fprintf(&b, "  %s/%s  %s  %s  %s\n", t.Group, t.Name, t.LatestVersion, t.Mode, t.Description)
+			fmt.Fprintf(&b, "  %s/%s/%s  %s  %s  %s\n", t.Domain, t.Group, t.Name, t.LatestVersion, t.Mode, t.Description)
 		}
 		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
 	})
@@ -57,11 +61,12 @@ func RegisterTaoluTools(server *mcp.Server) {
 		Name:        "taolu_save",
 		Description: "Save a taolu (SKILL.md + ACTION.md, plus optional files/ assets) to the vault as a new version. Validates slugs, both frontmatters, and asset paths, commits all files together, and tags the version (v1, v2, ... unless version_label is given).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		Name   string `json:"name" jsonschema:"taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`
-		Group  string `json:"group" jsonschema:"group folder, e.g. backend, frontend, workflows, meta (required)"`
-		Skill  string `json:"skill" jsonschema:"full SKILL.md content including YAML frontmatter (required)"`
-		Action string `json:"action" jsonschema:"full ACTION.md content including YAML frontmatter (required)"`
-		Files  []struct {
+		Name    string `json:"name" jsonschema:"taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`
+		Group   string `json:"group" jsonschema:"group folder, e.g. backend, frontend, workflows, meta (required)"`
+		Domain  string `json:"domain,omitempty" jsonschema:"domain folder, e.g. @local, @liyu1981; defaults to @local or user-domain"`
+		Skill   string `json:"skill" jsonschema:"full SKILL.md content including YAML frontmatter (required)"`
+		Action  string `json:"action" jsonschema:"full ACTION.md content including YAML frontmatter (required)"`
+		Files   []struct {
 			Path    string `json:"path" jsonschema:"asset path relative to the files/ directory, e.g. Button.tsx or components/Button.tsx (required)"`
 			Content string `json:"content" jsonschema:"asset file content (required)"`
 		} `json:"files,omitempty" jsonschema:"optional files/ assets: each {path, content} pair is committed as a support file of the taolu"`
@@ -75,6 +80,11 @@ func RegisterTaoluTools(server *mcp.Server) {
 		}
 		if !vault.ValidSlug(args.Group) {
 			return nil, nil, fmt.Errorf("invalid group %q: must be 1-64 lowercase alphanumeric with single hyphens", args.Group)
+		}
+		if args.Domain == "" {
+			args.Domain = vault.DomainPrefix
+		} else if !vault.ValidDomain(args.Domain) {
+			return nil, nil, fmt.Errorf("invalid domain %q: must start with @ and be a valid slug", args.Domain)
 		}
 		if err := vault.ValidateContent(args.Name, args.Skill); err != nil {
 			return nil, nil, err
@@ -102,12 +112,12 @@ func RegisterTaoluTools(server *mcp.Server) {
 				return nil, nil, fmt.Errorf("taolu %q is archived; restore it before saving a new version", args.Name)
 			}
 		}
-		label, uuid, total, err := vault.SaveTaolu(r, args.Group, args.Name, args.Skill, args.Action, assets, args.Message, args.User, args.VersionLabel)
+		label, uuid, total, err := vault.SaveTaoluWithDomain(r, args.Domain, args.Group, args.Name, args.Skill, args.Action, assets, args.Message, args.User, args.VersionLabel)
 		if err != nil {
 			return nil, nil, err
 		}
-		return textResult(fmt.Sprintf("saved %s/%s\nversion: %s (%s)\ntotal versions: %d\nfiles: %d\nvault: %s",
-			args.Group, args.Name, label, vault.ShortUUID(uuid), total, len(assets), p)), nil, nil
+		return textResult(fmt.Sprintf("saved %s/%s/%s\nversion: %s (%s)\ntotal versions: %d\nfiles: %d\nvault: %s",
+			args.Domain, args.Group, args.Name, label, vault.ShortUUID(uuid), total, len(assets), p)), nil, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -153,11 +163,12 @@ func RegisterTaoluTools(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_list",
-		Description: "List taolus in the vault, optionally filtered by query, tag, or group. Returns name, group, action mode, latest version, and description.",
+		Description: "List taolus in the vault, optionally filtered by query, tag, group, or domain. Returns name, group, domain, action mode, latest version, and description.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		Query   string `json:"query,omitempty" jsonschema:"case-insensitive substring match against name, description, and tags"`
 		Tag     string `json:"tag,omitempty" jsonschema:"require this tag in the taolu's metadata tags (comma-separated match)"`
 		Group   string `json:"group,omitempty" jsonschema:"only list taolus under this group"`
+		Domain  string `json:"domain,omitempty" jsonschema:"only list taolus under this domain (e.g. @local, @liyu1981)"`
 		Path    string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
 		Include string `json:"include,omitempty" jsonschema:"action modes to include, comma-separated (apply, install, enforce); empty means all"`
 	}) (*mcp.CallToolResult, any, error) {
@@ -181,6 +192,9 @@ func RegisterTaoluTools(server *mcp.Server) {
 		var matches []vault.TaoluInfo
 		for _, t := range taolus {
 			if args.Group != "" && t.Group != args.Group {
+				continue
+			}
+			if args.Domain != "" && t.Domain != args.Domain {
 				continue
 			}
 			if len(wanted) > 0 && !wanted[t.Mode] {
@@ -207,10 +221,13 @@ func RegisterTaoluTools(server *mcp.Server) {
 			matches = append(matches, t)
 		}
 		sort.Slice(matches, func(i, j int) bool {
-			if matches[i].Group == matches[j].Group {
-				return matches[i].Name < matches[j].Name
+			if matches[i].Domain == matches[j].Domain {
+				if matches[i].Group == matches[j].Group {
+					return matches[i].Name < matches[j].Name
+				}
+				return matches[i].Group < matches[j].Group
 			}
-			return matches[i].Group < matches[j].Group
+			return matches[i].Domain < matches[j].Domain
 		})
 		if len(matches) == 0 {
 			return textResult("no taolus match"), nil, nil
@@ -218,7 +235,7 @@ func RegisterTaoluTools(server *mcp.Server) {
 		var b strings.Builder
 		fmt.Fprintf(&b, "%d taolu(s):\n", len(matches))
 		for _, t := range matches {
-			fmt.Fprintf(&b, "  %s/%s  %s  %s  %s\n", t.Group, t.Name, t.LatestVersion, t.Mode, t.Description)
+			fmt.Fprintf(&b, "  %s/%s/%s  %s  %s  %s\n", t.Domain, t.Group, t.Name, t.LatestVersion, t.Mode, t.Description)
 		}
 		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
 	})
@@ -590,5 +607,71 @@ func RegisterTaoluTools(server *mcp.Server) {
 			fmt.Fprintf(&b, "  %s\n", f)
 		}
 		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_config",
+		Description: "Get or set vault configuration, including user domain and domain aliases.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Action string `json:"action" jsonschema:"action: get or set (required)"`
+		Key    string `json:"key" jsonschema:"config key: user-domain, domain-aliases (required)"`
+		Value  string `json:"value,omitempty" jsonschema:"value to set (required for set action)"`
+		Path   string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Action == "" || args.Key == "" {
+			return nil, nil, errors.New("action and key are required")
+		}
+		r, _, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		switch args.Action {
+		case "get":
+			switch args.Key {
+			case "user-domain":
+				val, err := vault.GetUserDomain(r)
+				if err != nil {
+					return nil, nil, err
+				}
+				return textResult(fmt.Sprintf("user-domain: %s", val)), nil, nil
+			case "domain-aliases":
+				val, err := vault.GetDomainAliases(r)
+				if err != nil {
+					return nil, nil, err
+				}
+				if val == nil {
+					return textResult("domain-aliases: (none)"), nil, nil
+				}
+				data, _ := json.MarshalIndent(val, "", "  ")
+				return textResult(fmt.Sprintf("domain-aliases:\n%s", string(data))), nil, nil
+			default:
+				return nil, nil, fmt.Errorf("unknown config key %q", args.Key)
+			}
+		case "set":
+			if args.Value == "" {
+				return nil, nil, errors.New("value is required for set action")
+			}
+			switch args.Key {
+			case "user-domain":
+				if err := vault.SetUserDomain(r, args.Value); err != nil {
+					return nil, nil, err
+				}
+				return textResult(fmt.Sprintf("set user-domain to %s", args.Value)), nil, nil
+			case "domain-aliases":
+				var aliases map[string]string
+				if err := json.Unmarshal([]byte(args.Value), &aliases); err != nil {
+					return nil, nil, fmt.Errorf("invalid JSON for domain-aliases: %w", err)
+				}
+				if err := vault.SetDomainAliases(r, aliases); err != nil {
+					return nil, nil, err
+				}
+				return textResult(fmt.Sprintf("set domain-aliases to %s", args.Value)), nil, nil
+			default:
+				return nil, nil, fmt.Errorf("unknown config key %q", args.Key)
+			}
+		default:
+			return nil, nil, fmt.Errorf("unknown action %q: must be get or set", args.Action)
+		}
 	})
 }

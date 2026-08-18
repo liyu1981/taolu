@@ -90,7 +90,8 @@ func TestFindSkillPath(t *testing.T) {
 		t.Fatalf("FindSkillPath(missing): %v", err)
 	}
 	saveTestTaolu(t, r, "workflows", "go-lint")
-	if sp := mustFindSkill(t, r, "go-lint"); sp != "taolus/workflows/go-lint/SKILL.md" {
+	// New 3-layer format with @local domain
+	if sp := mustFindSkill(t, r, "go-lint"); sp != "taolus/@local/workflows/go-lint/SKILL.md" {
 		t.Errorf("path = %q", sp)
 	}
 }
@@ -203,7 +204,8 @@ func TestSkillHistoryAcrossTwoRenames(t *testing.T) {
 	if len(hist) != 5 {
 		t.Fatalf("history length = %d, want 5", len(hist))
 	}
-	paths := []string{"taolus/workflows/go-lint", "taolus/workflows/go-lint", "taolus/workflows/lint", "taolus/workflows/lint", "taolus/workflows/lint-all"}
+	// New 3-layer format with @local domain
+	paths := []string{"taolus/@local/workflows/go-lint", "taolus/@local/workflows/go-lint", "taolus/@local/workflows/lint", "taolus/@local/workflows/lint", "taolus/@local/workflows/lint-all"}
 	for i, v := range hist {
 		if v.Label != "v"+string(rune('1'+i)) {
 			t.Fatalf("hist[%d].Label = %q, want v%d", i, v.Label, i+1)

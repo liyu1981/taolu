@@ -52,6 +52,7 @@ export const api = {
   taolus: (params?: {
     query?: string;
     group?: string;
+    domain?: string;
     include?: string;
     tag?: string;
     archived?: boolean;
@@ -59,6 +60,7 @@ export const api = {
     const q = new URLSearchParams();
     if (params?.query) q.set("query", params.query);
     if (params?.group) q.set("group", params.group);
+    if (params?.domain) q.set("domain", params.domain);
     if (params?.include) q.set("include", params.include);
     if (params?.tag) q.set("tag", params.tag);
     if (params?.archived) q.set("archived", "true");

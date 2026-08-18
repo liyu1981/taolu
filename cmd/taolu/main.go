@@ -26,6 +26,8 @@ func main() {
 		runInstall(os.Args[2:])
 	case "init":
 		runInit(os.Args[2:])
+	case "migrate":
+		runMigrate(os.Args[2:])
 	case "version":
 		runVersion()
 	case "help", "--help", "-h":
@@ -44,6 +46,7 @@ Commands:
   serve     Start the MCP server and/or web UI
   init      Create or open the practice vault
   install   Install taolu slash commands for an agent tool
+  migrate   Migrate 2-layer taolus to 3-layer domain format
   version   Show the build version
   help      Show this help message
 

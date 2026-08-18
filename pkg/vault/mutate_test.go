@@ -113,10 +113,11 @@ func TestRenameContinuesVersioning(t *testing.T) {
 		if v.Label != "v"+string(rune('1'+i)) {
 			t.Fatalf("hist[%d].Label = %q, want v%d", i, v.Label, i+1)
 		}
-		if i < 2 && !strings.HasPrefix(v.Path, "taolus/workflows/go-lint/") {
+		// New 3-layer format with @local domain
+		if i < 2 && !strings.HasPrefix(v.Path, "taolus/@local/workflows/go-lint/") {
 			t.Fatalf("hist[%d] path = %q, want old name path", i, v.Path)
 		}
-		if i == 2 && !strings.HasPrefix(v.Path, "taolus/workflows/lint-checks/") {
+		if i == 2 && !strings.HasPrefix(v.Path, "taolus/@local/workflows/lint-checks/") {
 			t.Fatalf("hist[%d] path = %q, want new name path", i, v.Path)
 		}
 	}
@@ -151,8 +152,9 @@ func TestRenameMovesGroup(t *testing.T) {
 		t.Fatalf("RenameTaolu into new group: %v", err)
 	}
 	sp := mustFindSkill(t, r, "lint-checks")
-	if !strings.HasPrefix(sp, "taolus/backend/") {
-		t.Fatalf("path = %q, want taolus/backend/...", sp)
+	// New 3-layer format with @local domain
+	if !strings.HasPrefix(sp, "taolus/@local/backend/") {
+		t.Fatalf("path = %q, want taolus/@local/backend/...", sp)
 	}
 }
 
@@ -198,7 +200,8 @@ func TestRenamePreservesAssetTree(t *testing.T) {
 	}
 
 	sp := mustFindSkill(t, r, "button-v2")
-	if !strings.HasPrefix(sp, "taolus/frontend/button-v2/") {
+	// New 3-layer format with @local domain
+	if !strings.HasPrefix(sp, "taolus/@local/frontend/button-v2/") {
 		t.Fatalf("path = %q", sp)
 	}
 	_, _, assets, err := ReadTaoluBundle(r, "button-v2", "")

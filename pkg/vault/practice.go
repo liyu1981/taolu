@@ -63,6 +63,126 @@ func ValidSlug(s string) bool {
 	return slugRe.MatchString(s)
 }
 
+// DomainPrefix is the well-known domain for the local Fossil vault.
+const DomainPrefix = "@local"
+
+// TaoluRef is a fully qualified reference to a taolu: @domain/group/name.
+type TaoluRef struct {
+	Domain string // "@local", "@liyu1981", etc.
+	Group  string // "frontend", "backend", etc.
+	Name   string // "local-first-webapp", etc.
+}
+
+// String returns the full taolu reference as "@domain/group/name".
+func (r TaoluRef) String() string {
+	return r.Domain + "/" + r.Group + "/" + r.Name
+}
+
+// Path returns the vault path for this taolu reference.
+func (r TaoluRef) Path() string {
+	return filepath.Join(taoluRoot, r.Domain, r.Group, r.Name, "SKILL.md")
+}
+
+// ActionPath returns the ACTION.md vault path for this taolu reference.
+func (r TaoluRef) ActionPath() string {
+	return filepath.Join(taoluRoot, r.Domain, r.Group, r.Name, "ACTION.md")
+}
+
+// Dir returns the taolu directory path (without SKILL.md).
+func (r TaoluRef) Dir() string {
+	return filepath.Join(taoluRoot, r.Domain, r.Group, r.Name)
+}
+
+// AssetPath returns the vault path of an asset relative to the files/ directory.
+func (r TaoluRef) AssetPath(rel string) string {
+	return filepath.Join(taoluRoot, r.Domain, r.Group, r.Name, taoluFilesDir, filepath.Clean(rel))
+}
+
+// ParseTaoluRef parses a full taolu reference "@domain/group/name" or "group/name".
+// For "group/name" format, domain defaults to empty (resolved later).
+func ParseTaoluRef(ref string) (TaoluRef, error) {
+	parts := strings.Split(ref, "/")
+	switch len(parts) {
+	case 3:
+		domain, group, name := parts[0], parts[1], parts[2]
+		if !strings.HasPrefix(domain, "@") {
+			return TaoluRef{}, fmt.Errorf("domain must start with @: %q", domain)
+		}
+		if !ValidSlug(group) {
+			return TaoluRef{}, fmt.Errorf("invalid group %q: must be 1-64 lowercase alphanumeric with single hyphens", group)
+		}
+		if !ValidSlug(name) {
+			return TaoluRef{}, fmt.Errorf("invalid name %q: must be 1-64 lowercase alphanumeric with single hyphens", name)
+		}
+		return TaoluRef{Domain: domain, Group: group, Name: name}, nil
+	case 2:
+		group, name := parts[0], parts[1]
+		if !ValidSlug(group) {
+			return TaoluRef{}, fmt.Errorf("invalid group %q: must be 1-64 lowercase alphanumeric with single hyphens", group)
+		}
+		if !ValidSlug(name) {
+			return TaoluRef{}, fmt.Errorf("invalid name %q: must be 1-64 lowercase alphanumeric with single hyphens", name)
+		}
+		return TaoluRef{Group: group, Name: name}, nil
+	default:
+		return TaoluRef{}, fmt.Errorf("invalid taolu reference %q: expected @domain/group/name or group/name", ref)
+	}
+}
+
+// ParseTaoluPath parses a vault path "taolus/@domain/group/name/SKILL.md" into a TaoluRef.
+func ParseTaoluPath(p string) (TaoluRef, bool) {
+	if filepath.Base(p) != "SKILL.md" {
+		return TaoluRef{}, false
+	}
+	if !strings.HasPrefix(p, taoluRoot+string(filepath.Separator)) {
+		return TaoluRef{}, false
+	}
+	parts := strings.Split(p, string(filepath.Separator))
+	// 3-layer format: taolus/@domain/group/name/SKILL.md -> 5 parts
+	if len(parts) == 5 && strings.HasPrefix(parts[1], "@") {
+		domain := parts[1]
+		group := parts[2]
+		name := parts[3]
+		if domain == "" || group == "" || name == "" {
+			return TaoluRef{}, false
+		}
+		return TaoluRef{Domain: domain, Group: group, Name: name}, true
+	}
+	// Legacy 2-layer format: taolus/group/name/SKILL.md -> 4 parts
+	if len(parts) == 4 && !strings.HasPrefix(parts[1], "@") {
+		group := parts[1]
+		name := parts[2]
+		if group == "" || name == "" {
+			return TaoluRef{}, false
+		}
+		return TaoluRef{Domain: DomainPrefix, Group: group, Name: name}, true
+	}
+	return TaoluRef{}, false
+}
+
+// ResolveTaoluRef resolves a taolu reference, filling in the domain if omitted.
+// If ref.Domain is empty, it uses userDomain if set, otherwise DomainPrefix.
+func ResolveTaoluRef(ref TaoluRef, userDomain string) TaoluRef {
+	if ref.Domain != "" {
+		return ref
+	}
+	domain := DomainPrefix
+	if userDomain != "" {
+		domain = userDomain
+	}
+	ref.Domain = domain
+	return ref
+}
+
+// ValidDomain reports whether d is a valid domain: "@" followed by 1-63 lowercase
+// alphanumeric characters with single hyphens.
+func ValidDomain(d string) bool {
+	if !strings.HasPrefix(d, "@") {
+		return false
+	}
+	return ValidSlug(strings.TrimPrefix(d, "@"))
+}
+
 // practiceMeta is the YAML frontmatter of a SKILL.md.
 type practiceMeta struct {
 	Name          string            `yaml:"name"`
@@ -167,14 +287,42 @@ func ValidateAction(content string) error {
 	return nil
 }
 
-// skillPath returns the SKILL.md path of a taolu.
+// skillPath returns the SKILL.md path of a taolu (legacy 2-layer format).
 func skillPath(group, name string) string {
 	return filepath.Join(taoluRoot, group, name, "SKILL.md")
 }
 
-// actionPath returns the ACTION.md path of a taolu.
+// skillPathWithDomain returns the SKILL.md path of a taolu with domain (3-layer format).
+func skillPathWithDomain(domain, group, name string) string {
+	return filepath.Join(taoluRoot, domain, group, name, "SKILL.md")
+}
+
+// skillPath returns the SKILL.md path of a taolu with domain (3-layer format).
+// If domain is empty, it uses DomainPrefix.
+func skillPathDomain(domain, group, name string) string {
+	if domain == "" {
+		domain = DomainPrefix
+	}
+	return filepath.Join(taoluRoot, domain, group, name, "SKILL.md")
+}
+
+// actionPath returns the ACTION.md path of a taolu (legacy 2-layer format).
 func actionPath(group, name string) string {
 	return filepath.Join(taoluRoot, group, name, "ACTION.md")
+}
+
+// actionPathWithDomain returns the ACTION.md path of a taolu with domain (3-layer format).
+func actionPathWithDomain(domain, group, name string) string {
+	return filepath.Join(taoluRoot, domain, group, name, "ACTION.md")
+}
+
+// actionPath returns the ACTION.md path of a taolu with domain (3-layer format).
+// If domain is empty, it uses DomainPrefix.
+func actionPathDomain(domain, group, name string) string {
+	if domain == "" {
+		domain = DomainPrefix
+	}
+	return filepath.Join(taoluRoot, domain, group, name, "ACTION.md")
 }
 
 // assetPath returns the vault path of an asset relative to the files/
@@ -237,46 +385,89 @@ func ValidateAssets(assets []Asset) error {
 	return nil
 }
 
-// parseSkillPath parses taolus/<group>/<name>/SKILL.md. Returns ok=false for
-// any other file (including legacy practices/ paths and support files inside a
-// taolu directory).
+// parseSkillPath parses taolus/<group>/<name>/SKILL.md or taolus/@domain/<group>/<name>/SKILL.md.
+// Returns ok=false for any other file. For backward compatibility, legacy 2-layer
+// paths are treated as @local domain.
 func parseSkillPath(p string) (group, name string, ok bool) {
-	if filepath.Base(p) != "SKILL.md" {
+	ref, ok := ParseTaoluPath(p)
+	if !ok {
 		return "", "", false
 	}
-	if !strings.HasPrefix(p, taoluRoot+string(filepath.Separator)) {
-		return "", "", false
-	}
-	name = filepath.Base(filepath.Dir(p))
-	group = filepath.Base(filepath.Dir(filepath.Dir(p)))
-	if group == "" || name == "" || group == "." || name == "." {
-		return "", "", false
-	}
-	return group, name, true
+	return ref.Group, ref.Name, true
 }
 
-// parseAssetPath parses an asset path taolus/<group>/<name>/files/<rel...>.
-// Returns ok=false for any other file (including SKILL.md/ACTION.md and stray
-// files inside the taolu directory).
+// parseSkillPathFull parses taolus/<group>/<name>/SKILL.md or taolus/@domain/<group>/<name>/SKILL.md
+// and returns the full TaoluRef. This is the preferred function for new code.
+func parseSkillPathFull(p string) (TaoluRef, bool) {
+	return ParseTaoluPath(p)
+}
+
+// parseAssetPath parses an asset path taolus/<group>/<name>/files/<rel...> or
+// taolus/@domain/<group>/<name>/files/<rel...>. Returns ok=false for any other file.
 func parseAssetPath(p string) (group, name, rel string, ok bool) {
 	if !strings.HasPrefix(p, taoluRoot+string(filepath.Separator)) {
 		return "", "", "", false
 	}
 	parts := strings.Split(p, string(filepath.Separator))
-	if len(parts) < 5 || parts[0] != taoluRoot || parts[3] != taoluFilesDir {
-		return "", "", "", false
+	// 3-layer format: taolus/@domain/group/name/files/rel... -> 6+ parts
+	if len(parts) >= 6 && strings.HasPrefix(parts[1], "@") && parts[4] == taoluFilesDir {
+		group, name = parts[2], parts[3]
+		if group == "" || name == "" || group == "." || name == "." {
+			return "", "", "", false
+		}
+		return group, name, strings.Join(parts[5:], string(filepath.Separator)), true
 	}
-	group, name = parts[1], parts[2]
-	if group == "" || name == "" || group == "." || name == "." {
-		return "", "", "", false
+	// Legacy 2-layer format: taolus/group/name/files/rel... -> 5+ parts
+	if len(parts) >= 5 && !strings.HasPrefix(parts[1], "@") && parts[3] == taoluFilesDir {
+		group, name = parts[1], parts[2]
+		if group == "" || name == "" || group == "." || name == "." {
+			return "", "", "", false
+		}
+		return group, name, strings.Join(parts[4:], string(filepath.Separator)), true
 	}
-	return group, name, strings.Join(parts[4:], string(filepath.Separator)), true
+	return "", "", "", false
+}
+
+// parseAssetPathFull parses an asset path and returns the full TaoluRef plus relative path.
+func parseAssetPathFull(p string) (TaoluRef, string, bool) {
+	if !strings.HasPrefix(p, taoluRoot+string(filepath.Separator)) {
+		return TaoluRef{}, "", false
+	}
+	parts := strings.Split(p, string(filepath.Separator))
+	// 3-layer format: taolus/@domain/group/name/files/rel... -> 6+ parts
+	if len(parts) >= 6 && strings.HasPrefix(parts[1], "@") && parts[4] == taoluFilesDir {
+		group, name := parts[2], parts[3]
+		if group == "" || name == "" || group == "." || name == "." {
+			return TaoluRef{}, "", false
+		}
+		rel := strings.Join(parts[5:], string(filepath.Separator))
+		return TaoluRef{Domain: parts[1], Group: group, Name: name}, rel, true
+	}
+	// Legacy 2-layer format: taolus/group/name/files/rel... -> 5+ parts
+	if len(parts) >= 5 && !strings.HasPrefix(parts[1], "@") && parts[3] == taoluFilesDir {
+		group, name := parts[1], parts[2]
+		if group == "" || name == "" || group == "." || name == "." {
+			return TaoluRef{}, "", false
+		}
+		rel := strings.Join(parts[4:], string(filepath.Separator))
+		return TaoluRef{Domain: DomainPrefix, Group: group, Name: name}, rel, true
+	}
+	return TaoluRef{}, "", false
 }
 
 func skillGroup(path string) string {
-	group, _, ok := parseSkillPath(path)
+	ref, ok := ParseTaoluPath(path)
 	if !ok {
 		return "general"
 	}
-	return group
+	return ref.Group
+}
+
+// skillDomain returns the domain of a taolu from its SKILL.md path.
+func skillDomain(path string) string {
+	ref, ok := ParseTaoluPath(path)
+	if !ok {
+		return DomainPrefix
+	}
+	return ref.Domain
 }

@@ -11,6 +11,8 @@ export interface Status {
   taolu_count: number;
   archived_count: number;
   groups: string[];
+  domains: string[];
+  user_domain: string;
   authoring: string;
   uptime: string;
   installed: Record<string, InstalledInfo>;
@@ -19,6 +21,7 @@ export interface Status {
 export interface TaoluItem {
   name: string;
   group: string;
+  domain: string;
   mode: string;
   description: string;
   tags: string[];
@@ -33,6 +36,7 @@ export interface AssetMeta {
 export interface TaoluDetail {
   name: string;
   group: string;
+  domain: string;
   mode: string;
   archived: boolean;
   skill: string;
