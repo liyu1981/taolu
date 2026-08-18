@@ -33,9 +33,10 @@ The taolu MCP server provides these tools:
 - taolu_rename: rename a taolu
 - taolu_info: show vault metadata
 - taolu_export: export full taolu content with all assets
-- taolu_init: initialize or inspect the vault
 - taolu_install_commands: install slash commands for an agent tool
 - taolu_list_archived: list archived taolus
+
+If the vault is not initialized, tell the user to run "taolu init" in their terminal.
 
 Interpret the user's intent and use the appropriate tool.
 If the request is ambiguous, list available taolus first with taolu_list.

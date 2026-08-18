@@ -24,6 +24,8 @@ func main() {
 		runServe(os.Args[2:])
 	case "install":
 		runInstall(os.Args[2:])
+	case "init":
+		runInit(os.Args[2:])
 	case "version":
 		runVersion()
 	case "help", "--help", "-h":
@@ -40,6 +42,7 @@ func printUsage() {
 
 Commands:
   serve     Start the MCP server and/or web UI
+  init      Create or open the practice vault
   install   Install taolu slash commands for an agent tool
   version   Show the build version
   help      Show this help message

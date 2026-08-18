@@ -36,7 +36,7 @@ type PracticeVersion struct {
 	Path    string
 }
 
-// OpenVault opens the vault repo at path, or fails with a hint to run taolu_init.
+// OpenVault opens the vault repo at path, or fails with a hint to run taolu init.
 func OpenVault(path string) (*libfossil.Repo, string, error) {
 	p, err := VaultPath(path)
 	if err != nil {
@@ -44,7 +44,7 @@ func OpenVault(path string) (*libfossil.Repo, string, error) {
 	}
 	r, err := libfossil.Open(p)
 	if err != nil {
-		return nil, "", fmt.Errorf("vault not initialized at %s (run taolu_init first): %w", p, err)
+		return nil, "", fmt.Errorf("vault not initialized at %s — run 'taolu init' in your terminal to create it", p)
 	}
 	return r, p, nil
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/yli/taolu/pkg/tools"
-	"github.com/yli/taolu/pkg/vault"
 	"github.com/yli/taolu/pkg/version"
 	"github.com/yli/taolu/pkg/web"
 )
@@ -51,10 +50,6 @@ Examples:
 	fs.Parse(args)
 
 	components := parseComponents(*with)
-
-	if err := initVaultAtStartup(); err != nil {
-		log.Fatalf("initialize vault: %v", err)
-	}
 
 	if components["stdio"] {
 		runStdio()
@@ -95,20 +90,6 @@ func parseComponents(s string) map[string]bool {
 		log.Fatal("--with=stdio is mutually exclusive with httpmcp and web")
 	}
 	return result
-}
-
-// initVaultAtStartup creates and seeds the default vault if it does not exist,
-// so the server is usable immediately without a separate taolu_init call.
-func initVaultAtStartup() error {
-	r, p, err := vault.EnsureVault("", "")
-	if err != nil {
-		return err
-	}
-	if err := r.Close(); err != nil {
-		return err
-	}
-	log.Printf("vault ready at %s", p)
-	return nil
 }
 
 func runStdio() {

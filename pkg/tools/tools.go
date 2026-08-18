@@ -17,29 +17,6 @@ import (
 // RegisterTaoluTools registers the taolu_* MCP tools on the server.
 func RegisterTaoluTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "taolu_init",
-		Description: "Create or open the practice vault (a Fossil repository), migrate any legacy practices/ tree, and ensure the taolu-authoring guide is seeded. Returns vault path, project-code, and taolu count.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
-		User string `json:"user,omitempty" jsonschema:"user recorded for seeded commits; defaults to admin"`
-	}) (*mcp.CallToolResult, any, error) {
-		r, p, err := vault.EnsureVault(args.Path, args.User)
-		if err != nil {
-			return nil, nil, err
-		}
-		defer r.Close()
-		projectCode, err := r.Config("project-code")
-		if err != nil {
-			return nil, nil, err
-		}
-		taolus, err := vault.ListTaolu(r)
-		if err != nil {
-			return nil, nil, err
-		}
-		return textResult(fmt.Sprintf("vault: %s\nproject-code: %s\ntaolus: %d (in %d groups)", p, projectCode, len(taolus), len(vault.UniqueGroups(taolus)))), nil, nil
-	})
-
-	mcp.AddTool(server, &mcp.Tool{
 		Name:        "taolu_info",
 		Description: "Show information about the practice vault: path, project-code, taolu count, groups, and the latest taolu-authoring version.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {

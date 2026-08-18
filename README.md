@@ -63,25 +63,24 @@ so multiple opencode instances connect to one process — the vault is touched b
 a single process and there is no SQLite lock contention.
 
 ```sh
-./taolu serve                       # starts both MCP server (:8264) and web UI (:8265)
-./taolu serve --with=httpmcp        # starts only the MCP server (no web UI)
-./taolu serve --with=web            # starts only the web UI (no MCP server)
-./taolu serve --with=stdio          # stdio mode (for single-process agent integration)
-./taolu install                     # install slash commands interactively (TUI)
-./taolu install --tool opencode     # install commands for opencode (non-interactive)
+./taolu init                          # create/open the vault (required first)
+./taolu serve                         # starts both MCP server (:8264) and web UI (:8265)
+./taolu serve --with=httpmcp          # starts only the MCP server (no web UI)
+./taolu serve --with=web              # starts only the web UI (no MCP server)
+./taolu serve --with=stdio            # stdio mode (for single-process agent integration)
+./taolu install                       # install slash commands interactively (TUI)
+./taolu install --tool opencode       # install commands for opencode (non-interactive)
 ```
 
 The web UI is a read-only browser for the vault (system status, taolu browser,
 and per-taolu version history, content, and diffs). It listens on the MCP port
 + 1 by default (`TAOLU_WEB_PORT`, `0` disables it).
 
-On startup the server **creates and seeds the default vault if it does not
-exist** (creating `~/.taolu/vault.fossil`, seeding the `taolu-authoring` guide,
-and migrating any legacy `practices/` tree), so it is usable immediately. When
-the bundled guide changes in a release, existing vaults are **upgraded to a new
+Run `taolu init` first to create and seed the default vault (`~/.taolu/vault.fossil`),
+the `taolu-authoring` guide, and migrate any legacy `practices/` tree. When the
+bundled guide changes in a release, existing vaults are **upgraded to a new
 version** of `taolu-authoring` rather than left stale; the old version stays in
-history. The `taolu_init` tool is only needed to initialize or re-inspect a
-non-default vault path.
+history.
 
 ## Configuration
 
@@ -155,7 +154,6 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
 
 | Tool | Purpose | Required | Optional |
 | --- | --- | --- | --- |
-| `taolu_init` | Create/open the vault, migrate legacy `practices/`, seed `taolu-authoring` | — | `path`, `user` |
 | `taolu_info` | Show vault path, project-code, taolus, groups | — | `path` |
 | `taolu_save` | Save a taolu (`SKILL.md` + `ACTION.md`, plus optional `files/` assets) as a new versioned check-in | `name`, `group`, `skill`, `action` | `files`, `version_label`, `message`, `user`, `path` |
 | `taolu_get` | Read a taolu's `SKILL.md` + `ACTION.md` at a version, plus a manifest of any `files/` assets; warns when the taolu is archived | `name` | `version`, `path` |
@@ -168,6 +166,7 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
 | `taolu_rename` | Rename a taolu (optionally into another group); rewrites the SKILL.md name and continues versioning at the next vN | `name`, `new_name` | `new_group`, `message`, `user`, `path` |
 | `taolu_delete` | Archive a taolu (commits an `.archived` marker); source tree is kept, reversible via `taolu_restore` | `name` | `message`, `user`, `path` |
 | `taolu_restore` | Restore an archived taolu back into normal listings and use | `name` | `message`, `user`, `path` |
+| `taolu_install_commands` | Install slash commands for an agent tool (opencode, claude, vscode) | `tool` | `target`, `scope`, `transport`, `port`, `repo_path`, `force` |
 
 ### Details
 
@@ -207,7 +206,7 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
 ## Example flow
 
 ```text
-taolu_init
+taolu init
 taolu_save   name=go-api-server group=backend skill=<SKILL.md> action=<ACTION.md>
 taolu_save   name=go-api-server group=backend skill=<v2> action=<v2> message="add pkg/ layout"
 taolu_list   query=go
