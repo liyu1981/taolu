@@ -553,26 +553,23 @@ func groupFor(r *libfossil.Repo, name string) string {
 	if sp == "" {
 		return ""
 	}
-	parts := strings.Split(sp, "/")
-	if len(parts) >= 3 {
-		return parts[1]
+	ref, ok := vault.ParseTaoluPath(sp)
+	if !ok {
+		return ""
 	}
-	return ""
+	return ref.Group
 }
 
 func domainFor(r *libfossil.Repo, name string) string {
 	sp := mustSkillPath(r, name)
 	if sp == "" {
-		return ""
+		return vault.DomainPrefix
 	}
-	parts := strings.Split(sp, "/")
-	if len(parts) >= 3 {
-		domain := parts[1]
-		if strings.HasPrefix(domain, "@") {
-			return domain
-		}
+	ref, ok := vault.ParseTaoluPath(sp)
+	if !ok {
+		return vault.DomainPrefix
 	}
-	return vault.DomainPrefix
+	return ref.Domain
 }
 
 func modeFor(r *libfossil.Repo, name string) string {
