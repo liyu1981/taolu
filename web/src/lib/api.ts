@@ -1,5 +1,6 @@
 import type {
   ContentResponse,
+  Config,
   DiffResponse,
   Status,
   TaoluDetail,
@@ -41,6 +42,25 @@ async function post<T>(url: string, body?: Record<string, string>): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function put<T>(url: string, body: object): Promise<T> {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const b = (await res.json()) as { error?: string };
+      if (b.error) msg = b.error;
+    } catch {
+      /* keep statusText */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as T;
+}
+
 export interface MutationResult {
   status: string;
   group: string;
@@ -49,6 +69,7 @@ export interface MutationResult {
 
 export const api = {
   status: () => get<Status>("/api/status"),
+  config: () => get<Config>("/api/config"),
   taolus: (params?: {
     query?: string;
     group?: string;
@@ -95,4 +116,5 @@ export const api = {
       `/api/taolus/${encodeURIComponent(name)}/restore`,
       message ? { message } : undefined,
     ),
+  setConfig: (config: Config) => put<Config>("/api/config", config),
 };

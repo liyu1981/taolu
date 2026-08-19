@@ -18,6 +18,10 @@ export interface Status {
   installed: Record<string, InstalledInfo>;
 }
 
+export interface Config {
+  user_domain: string;
+}
+
 export interface TaoluItem {
   name: string;
   group: string;

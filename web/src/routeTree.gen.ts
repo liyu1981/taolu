@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as BrowseIndexRouteImport } from './routes/browse/index'
 import { Route as BrowseNameRouteImport } from './routes/browse/$name'
@@ -17,6 +18,11 @@ import { Route as BrowseNameRouteImport } from './routes/browse/$name'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatusRoute = StatusRouteImport.update({
@@ -37,12 +43,14 @@ const BrowseNameRoute = BrowseNameRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/browse/$name': typeof BrowseNameRoute
   '/browse/': typeof BrowseIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/browse/$name': typeof BrowseNameRoute
   '/browse': typeof BrowseIndexRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/browse/$name': typeof BrowseNameRoute
   '/browse/': typeof BrowseIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/status' | '/browse/$name' | '/browse/'
+  fullPaths: '/' | '/settings' | '/status' | '/browse/$name' | '/browse/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/status' | '/browse/$name' | '/browse'
-  id: '__root__' | '/' | '/status' | '/browse/$name' | '/browse/'
+  to: '/' | '/settings' | '/status' | '/browse/$name' | '/browse'
+  id: '__root__' | '/' | '/settings' | '/status' | '/browse/$name' | '/browse/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
   BrowseNameRoute: typeof BrowseNameRoute
   BrowseIndexRoute: typeof BrowseIndexRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/status': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,
   BrowseNameRoute: BrowseNameRoute,
   BrowseIndexRoute: BrowseIndexRoute,

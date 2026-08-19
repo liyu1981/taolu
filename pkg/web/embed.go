@@ -21,6 +21,8 @@ func NewHandler(vaultPath string) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/status", handleStatus(vaultPath))
+	mux.HandleFunc("GET /api/config", handleConfig(vaultPath))
+	mux.HandleFunc("PUT /api/config", handleConfig(vaultPath))
 	mux.HandleFunc("GET /api/taolus", handleTaolus(vaultPath))
 	mux.HandleFunc("GET /api/taolus/{name}", handleTaolu(vaultPath))
 	mux.HandleFunc("GET /api/taolus/{name}/history", handleHistory(vaultPath))

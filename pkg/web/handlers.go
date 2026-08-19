@@ -31,6 +31,50 @@ type Status struct {
 	Installed     map[string]commands.InstalledInfo `json:"installed"`
 }
 
+// Config is the editable vault configuration exposed by the web UI.
+type Config struct {
+	UserDomain string `json:"user_domain"`
+}
+
+type configBody struct {
+	UserDomain string `json:"user_domain"`
+}
+
+// handleConfig reads or updates the user's default taolu domain.
+func handleConfig(vaultPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		repo, _, err := vault.OpenVault(vaultPath)
+		if err != nil {
+			apiError(w, http.StatusInternalServerError, "open vault: "+err.Error())
+			return
+		}
+		defer repo.Close()
+
+		switch r.Method {
+		case http.MethodGet:
+			domain, err := vault.GetUserDomain(repo)
+			if err != nil {
+				apiError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			jsonOK(w, Config{UserDomain: domain})
+		case http.MethodPut:
+			var body configBody
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				apiError(w, http.StatusBadRequest, "invalid JSON body")
+				return
+			}
+			if err := vault.SetUserDomain(repo, body.UserDomain); err != nil {
+				apiError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			jsonOK(w, Config{UserDomain: body.UserDomain})
+		default:
+			apiError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	}
+}
+
 // TaoluItem is a listing row for GET /api/taolus.
 type TaoluItem struct {
 	Name          string   `json:"name"`
