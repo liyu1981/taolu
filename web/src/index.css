@@ -54,6 +54,22 @@
   --input: hsl(240 5.9% 90%);
   --ring: hsl(240 5.9% 10%);
   --radius: 0.5rem;
+
+  /* syntax tokens (highlight.js) — light */
+  --code-comment: hsl(240 4% 46%);
+  --code-keyword: hsl(262 83% 50%);
+  --code-string: hsl(142 62% 33%);
+  --code-number: hsl(28 85% 42%);
+  --code-title: hsl(221 91% 43%);
+  --code-type: hsl(187 92% 26%);
+  --code-builtin: hsl(240 5.9% 30%);
+  --code-literal: hsl(28 85% 42%);
+  --code-attr: hsl(165 80% 28%);
+  --code-tag: hsl(352 86% 44%);
+  --code-meta: hsl(48 96% 38%);
+  --code-var: hsl(240 10% 3.9%);
+  --code-addition: hsl(142 62% 33%);
+  --code-deletion: hsl(352 86% 44%);
 }
 
 .dark {
@@ -76,6 +92,22 @@
   --border: hsl(240 3.7% 15.9%);
   --input: hsl(240 3.7% 15.9%);
   --ring: hsl(240 4.9% 83.9%);
+
+  /* syntax tokens (highlight.js) — dark */
+  --code-comment: hsl(240 5% 62%);
+  --code-keyword: hsl(267 84% 76%);
+  --code-string: hsl(131 55% 68%);
+  --code-number: hsl(33 90% 66%);
+  --code-title: hsl(217 91% 72%);
+  --code-type: hsl(187 92% 66%);
+  --code-builtin: hsl(240 5% 80%);
+  --code-literal: hsl(33 90% 66%);
+  --code-attr: hsl(165 60% 66%);
+  --code-tag: hsl(351 80% 72%);
+  --code-meta: hsl(45 90% 68%);
+  --code-var: hsl(0 0% 98%);
+  --code-addition: hsl(131 55% 68%);
+  --code-deletion: hsl(351 80% 72%);
 }
 
 @layer base {
@@ -200,6 +232,81 @@
     box-shadow:
       0 8px 32px rgb(0 0 0 / 0.45),
       inset 0 1px 0 color-mix(in oklch, white 14%, transparent);
+  }
+
+  /* syntax highlighting (highlight.js) — colors come from theme tokens so
+     light and dark follow the app theme automatically. */
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--code-comment);
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-doctag,
+  .hljs-meta .hljs-keyword,
+  .hljs-template-tag {
+    color: var(--code-keyword);
+  }
+  .hljs-string,
+  .hljs-regexp,
+  .hljs-subst,
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-template-variable {
+    color: var(--code-string);
+  }
+  .hljs-number,
+  .hljs-literal,
+  .hljs-char.escape_ {
+    color: var(--code-number);
+  }
+  .hljs-title,
+  .hljs-title.function_,
+  .hljs-section,
+  .hljs-name {
+    color: var(--code-title);
+  }
+  .hljs-title.class_,
+  .hljs-type,
+  .hljs-class .hljs-title {
+    color: var(--code-type);
+  }
+  .hljs-built_in,
+  .hljs-params {
+    color: var(--code-builtin);
+  }
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-selector-attr,
+  .hljs-selector-pseudo {
+    color: var(--code-attr);
+  }
+  .hljs-tag {
+    color: var(--code-tag);
+  }
+  .hljs-meta {
+    color: var(--code-meta);
+  }
+  .hljs-variable,
+  .hljs-variable.constant_,
+  .hljs-property {
+    color: var(--code-var);
+  }
+  .hljs-addition {
+    color: var(--code-addition);
+  }
+  .hljs-deletion {
+    color: var(--code-deletion);
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: 600;
+  }
+  .hljs-link {
+    text-decoration: underline;
   }
 }
 
