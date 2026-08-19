@@ -92,13 +92,16 @@ export default function TaoluDetailView() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="files">Files</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="diff">Diff</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
           <OverviewTab detail={detail.data} />
+        </TabsContent>
+        <TabsContent value="files">
+          <ContentTab name={name} history={history.data} historyLoading={history.isLoading} />
         </TabsContent>
         <TabsContent value="history">
           <HistoryTab
@@ -107,15 +110,18 @@ export default function TaoluDetailView() {
             error={history.error}
           />
         </TabsContent>
-        <TabsContent value="content">
-          <ContentTab name={name} history={history.data} historyLoading={history.isLoading} />
-        </TabsContent>
         <TabsContent value="diff">
           <DiffTab name={name} history={history.data} historyLoading={history.isLoading} />
         </TabsContent>
       </Tabs>
     </div>
   );
+}
+
+function truncateLines(text: string, maxLines = 20): string {
+  const lines = text.split("\n");
+  if (lines.length <= maxLines) return text;
+  return lines.slice(0, maxLines).join("\n") + "\n…";
 }
 
 function OverviewTab({ detail }: { detail: TaoluDetail }) {
@@ -127,8 +133,8 @@ function OverviewTab({ detail }: { detail: TaoluDetail }) {
         </div>
       )}
       <div className="grid gap-4 lg:grid-cols-2">
-        <CodeBlock filename="SKILL.md" content={detail.skill} />
-        <CodeBlock filename="ACTION.md" content={detail.action} />
+        <CodeBlock filename="SKILL.md" content={truncateLines(detail.skill)} />
+        <CodeBlock filename="ACTION.md" content={truncateLines(detail.action)} />
       </div>
       {detail.assets.length > 0 && (
         <div>
