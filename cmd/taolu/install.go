@@ -84,6 +84,7 @@ func resolveTools(tool string) []string {
 }
 
 func installTUI(force bool) {
+	overwrite := force
 	var (
 		selectedTools []string
 		scopeLocal    bool
@@ -132,6 +133,14 @@ func installTUI(force bool) {
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
+				Title("Update existing command files?").
+				Description("Existing commands keep the old templates. Choose update to overwrite them with the latest ones.").
+				Affirmative("Update existing").
+				Negative("Keep existing").
+				Value(&overwrite),
+		),
+		huh.NewGroup(
+			huh.NewConfirm().
 				Title("Install now?").
 				Description("This will write command files and merge MCP config.").
 				Affirmative("Install").
@@ -164,7 +173,7 @@ func installTUI(force bool) {
 			Tool:      toolID,
 			Scope:     scope,
 			Transport: transport,
-			Force:     force,
+			Force:     overwrite,
 		}
 		written, err := commands.Install(opts)
 		if err != nil {
