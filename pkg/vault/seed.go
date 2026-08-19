@@ -21,14 +21,18 @@ metadata:
 
 ## What a taolu is
 
-A **taolu** is a skill plus an action. It is the unit of knowledge in the
-vault: a reusable convention, saved under a **group** (a domain folder), and
-versioned in the Fossil database.
+A **taolu** is a skill plus an action, plus the assets files they reference.
+It is the unit of knowledge in the vault: a reusable convention, saved under a
+**group** (a domain folder), and versioned in the Fossil database.
 
 - The **skill** is a SKILL.md document describing the convention.
 - The **action** is an ACTION.md document telling the agent what to do after
   obtaining the skill. Skill and action are one taolu: they are saved,
   versioned, read, and diffed together.
+- The **assets** are optional support files carried under files/ (snippets,
+  templates, complete components). If the skill or action refers to an asset
+  file by path, that file must be saved together with skill and action in the
+  same taolu_save — never reference a file you are not committing.
 
 ### Action modes
 
@@ -135,6 +139,9 @@ the files argument on taolu_save:
   project.
 - Reference assets from SKILL.md by their relative path (see files/Button.tsx);
   because install preserves the tree, the references hold in the installed skill.
+- If the skill or action refers to an asset file, save that file together with
+  skill and action in the same taolu_save — references and their files are one
+  taolu and must not be split across saves.
 - Keep assets verbatim; if a component needs adapting per project, say so in the
   SKILL.md/ACTION.md prose — the agent applies the adaptation.
 - The whole bundle is part of the taolu: it versions, diffs, renames, and
@@ -159,9 +166,13 @@ Use the action mode confirmed in step 2:
 
 Before saving or applying the taolu, get explicit approval:
 
-- Present the taolu for review. If the taolu is long, provide a brief of it
-  (name, group, action mode, one-line description, and a short summary of the
-  conventions it captures) and offer the option to review it in full length.
+- Present the taolu for review briefly and concisely: name, group, action
+  mode, a one-line description, and a short summary of the conventions it
+  captures. Do not paste full document bodies into the confirmation.
+- For assets, a file list is enough — list the files/ paths (e.g.
+  files/Button.tsx, files/components/App.tsx). Do not include asset file
+  contents in the confirmation; offer to review them in full length if the
+  user asks.
 - Ask for approval through the interactive UI when one is available — for
   example, opencode's ask tool or any elicitation prompt the client exposes.
   Fall back to a plain text prompt only when no UI mechanism exists.

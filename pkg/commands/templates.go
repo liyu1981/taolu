@@ -76,8 +76,9 @@ Follow the taolu-authoring guide:
 3. Survey the project: README, AGENTS.md, module structure, tooling
 4. Extract durable conventions
 5. Write SKILL.md with YAML frontmatter
-6. Write ACTION.md with the confirmed mode
-7. Review and get explicit approval before saving
+6. Collect any asset files the skill or action references (paths relative to files/)
+7. Write ACTION.md with the confirmed mode
+8. Review briefly and get explicit approval before saving (for assets, list the files/ paths, not their contents)
 `
 
 const taoluSaveCmd = `---
@@ -91,5 +92,8 @@ Use the taolu_save tool. Ensure:
 - Group is specified (e.g. backend, frontend, workflows, meta)
 - SKILL.md has valid frontmatter (name, description)
 - ACTION.md has a valid mode (apply, install, or enforce)
-- Get user approval before saving
+- Files the skill or action references are passed as files/ assets and saved
+  together with skill and action in this same call
+- Get user approval before saving; confirm briefly and list asset paths only,
+  not their contents
 `
