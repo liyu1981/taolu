@@ -36,6 +36,9 @@ const (
 	// originMarker records the previous directory path (under taolus/) of a
 	// renamed taolu, so version history continues across renames.
 	originMarker = "origin"
+	// forkMarker records the source taolu and version a fork was created from,
+	// so provenance is knowable while the fork evolves independently.
+	forkMarker = ".fork"
 )
 
 // Taolu action modes.
@@ -335,7 +338,7 @@ func assetPath(group, name, rel string) string {
 // collide with the taolu's canonical documents, markers, or the bundle root.
 var reservedAssetNames = map[string]bool{
 	"SKILL.md": true, "ACTION.md": true, ".archived": true,
-	"origin": true, ".taolu-version": true, taoluFilesDir: true,
+	"origin": true, ".fork": true, ".taolu-version": true, taoluFilesDir: true,
 }
 
 // ValidateAssets checks each asset's path and size. Paths must be relative to

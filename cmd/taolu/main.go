@@ -28,6 +28,10 @@ func main() {
 		runInit(os.Args[2:])
 	case "migrate":
 		runMigrate(os.Args[2:])
+	case "fork":
+		runFork(os.Args[2:])
+	case "fork-info":
+		runForkInfo(os.Args[2:])
 	case "version":
 		runVersion()
 	case "help", "--help", "-h":
@@ -43,12 +47,14 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, `Usage: taolu <command> [options]
 
 Commands:
-  serve     Start the MCP server and/or web UI
-  init      Create or open the practice vault
-  install   Install taolu slash commands for an agent tool
-  migrate   Migrate 2-layer taolus to 3-layer domain format
-  version   Show the build version
-  help      Show this help message
+  serve      Start the MCP server and/or web UI
+  init       Create or open the practice vault
+  install    Install taolu slash commands for an agent tool
+  migrate    Migrate 2-layer taolus to 3-layer domain format
+  fork       Fork a taolu into a new name (clones content + history)
+  fork-info  Show fork provenance for a taolu
+  version    Show the build version
+  help       Show this help message
 
 Run 'taolu <command> --help' for command-specific options.`)
 }

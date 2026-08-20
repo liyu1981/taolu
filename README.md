@@ -164,6 +164,8 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
 | `taolu_apply` | Apply a taolu per its action: apply / install / enforce; refuses archived taolus | `name` | `version`, `target`, `format`, `action`, `force`, `path` |
 | `taolu_export` | Export raw taolu content (skill, action, and every `files/` asset) at a version; warns when archived | `name` | `version`, `path` |
 | `taolu_rename` | Rename a taolu (optionally into another group); rewrites the SKILL.md name and continues versioning at the next vN | `name`, `new_name` | `new_group`, `message`, `user`, `path` |
+| `taolu_fork` | Fork a taolu: clone its SKILL.md, ACTION.md, and files/ assets into a new name under the same domain/group; records a `.fork` provenance marker so the fork's history shows the copied upstream lineage followed by independent saves | `name`, `new_name` | `new_group`, `message`, `user`, `path` |
+| `taolu_fork_info` | Show fork provenance for a taolu: the source taolu and version it was forked from, or a note that it is not a fork | `name` | `path` |
 | `taolu_delete` | Archive a taolu (commits an `.archived` marker); source tree is kept, reversible via `taolu_restore` | `name` | `message`, `user`, `path` |
 | `taolu_restore` | Restore an archived taolu back into normal listings and use | `name` | `message`, `user`, `path` |
 | `taolu_install_commands` | Install slash commands for an agent tool (opencode, claude, vscode) | `tool` | `target`, `scope`, `transport`, `port`, `repo_path`, `force` |
@@ -195,6 +197,11 @@ All tools take an optional `path` (vault repo; defaults to `TAOLU_REPO` or `~/.t
   `taolu_export` warn, and makes `taolu_save`/`taolu_apply` refuse. Use
   `taolu_list_archived` to see archived taolus and `taolu_restore` to bring one
   back. The built-in `taolu-authoring` guide can be neither archived nor renamed.
+- **Fork** (`taolu_fork`) clones a taolu under a new name, keeping the
+  original. The fork records a `.fork` marker with the source taolu ref and
+  version forked from. `SkillHistory` follows the `.fork` marker so the
+  fork's `v1..vN` shows the copied upstream lineage, and subsequent saves
+  continue the version sequence independently. The source taolu is untouched.
 - **Apply** dispatches on the action: `apply` returns the content for a one-shot
   use (nothing written); `install` writes `.opencode/skills/<name>/SKILL.md`
   (or `.claude/skills` / `.agents/skills` via `format`) plus the `files/` tree

@@ -235,7 +235,11 @@ func RegisterTaoluTools(server *mcp.Server) {
 		var b strings.Builder
 		fmt.Fprintf(&b, "%d taolu(s):\n", len(matches))
 		for _, t := range matches {
-			fmt.Fprintf(&b, "  %s/%s/%s  %s  %s  %s\n", t.Domain, t.Group, t.Name, t.LatestVersion, t.Mode, t.Description)
+			fork := ""
+			if t.ForkSource != "" {
+				fork = "  (fork of " + t.ForkSource + ")"
+			}
+			fmt.Fprintf(&b, "  %s/%s/%s  %s  %s  %s%s\n", t.Domain, t.Group, t.Name, t.LatestVersion, t.Mode, t.Description, fork)
 		}
 		return textResult(strings.TrimSuffix(b.String(), "\n")), nil, nil
 	})
@@ -562,6 +566,82 @@ func RegisterTaoluTools(server *mcp.Server) {
 		}
 		return textResult(fmt.Sprintf("renamed %s/%s -> %s/%s\nSKILL.md frontmatter name updated\nversion history continued\nvault: %s",
 			oldGroup, args.Name, newGroup, args.NewName, p)), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_fork",
+		Description: "Fork a taolu: clone its SKILL.md, ACTION.md, and files/ assets into a new name under the same domain/group, keeping the original. Records a .fork provenance marker (source ref + version) so the new taolu's history shows the copied upstream lineage followed by its own independent versions. Refuses archived sources and existing target names.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Name     string `json:"name" jsonschema:"source taolu reference to fork, e.g. @local/backend/go-api-server (required)"`
+		NewName  string `json:"new_name" jsonschema:"new taolu name (slug, 1-64 lowercase alphanumeric with single hyphens) (required)"`
+		NewGroup string `json:"new_group,omitempty" jsonschema:"new group folder; defaults to the source group"`
+		Message  string `json:"message,omitempty" jsonschema:"commit message; defaults to 'fork taolu <name> to <new_name>'"`
+		User     string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
+		Path     string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Name == "" || args.NewName == "" {
+			return nil, nil, errors.New("name and new_name are required")
+		}
+		r, p, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		ref, err := vault.ParseTaoluRefWithConfig(r, args.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		f, err := vault.ForkTaolu(r, ref, args.NewName, args.NewGroup, args.Message, args.User)
+		if err != nil {
+			return nil, nil, err
+		}
+		newRef := vault.TaoluRef{Domain: f.Source.Domain, Group: args.NewGroup, Name: args.NewName}
+		if newRef.Group == "" {
+			newRef.Group = f.Source.Group
+		}
+		hist, err := vault.SkillHistory(r, newRef.Path())
+		if err != nil {
+			return nil, nil, err
+		}
+		return textResult(fmt.Sprintf("forked %s -> %s\nforked from: %s (version %s)\nhistory: %d version(s)\nvault: %s",
+			f.Source.String(), newRef.String(), f.Source.String(), f.Version, len(hist), p)), nil, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "taolu_fork_info",
+		Description: "Show fork provenance for a taolu: the source taolu and version it was forked from, or a note that it is not a fork.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Name string `json:"name" jsonschema:"taolu reference (required)"`
+		Path string `json:"path,omitempty" jsonschema:"vault repository path; defaults to TAOLU_REPO or ~/.taolu/vault.fossil"`
+	}) (*mcp.CallToolResult, any, error) {
+		if args.Name == "" {
+			return nil, nil, errors.New("name is required")
+		}
+		r, _, err := vault.OpenVault(args.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer r.Close()
+		ref, err := vault.ParseTaoluRefWithConfig(r, args.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		sp, err := vault.FindSkillPathByRefResolved(r, ref)
+		if err != nil {
+			return nil, nil, err
+		}
+		if sp == "" {
+			return nil, nil, fmt.Errorf("taolu %q not found in vault", ref.String())
+		}
+		f, err := vault.ReadForkInfo(r, ref)
+		if err != nil {
+			return nil, nil, err
+		}
+		if f == nil {
+			return textResult(fmt.Sprintf("%s is not a fork", ref.String())), nil, nil
+		}
+		return textResult(fmt.Sprintf("%s\nforked from: %s\nsource version: %s\nsource uuid: %s",
+			ref.String(), f.Source.String(), f.Version, vault.ShortUUID(f.SourceUUID))), nil, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{

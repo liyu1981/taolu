@@ -17,18 +17,20 @@ import (
 
 // Status is the response for GET /api/status.
 type Status struct {
-	ServerName    string                        `json:"server_name"`
-	ServerVersion string                        `json:"server_version"`
-	VaultPath     string                        `json:"vault_path"`
-	ProjectCode   string                        `json:"project_code"`
-	TaoluCount    int                           `json:"taolu_count"`
-	ArchivedCount int                           `json:"archived_count"`
-	Groups        []string                      `json:"groups"`
-	Domains       []string                      `json:"domains"`
-	UserDomain    string                        `json:"user_domain"`
-	Authoring     string                        `json:"authoring"`
-	Uptime        string                        `json:"uptime"`
-	Installed     map[string]commands.InstalledInfo `json:"installed"`
+	ServerName      string                        `json:"server_name"`
+	ServerVersion   string                        `json:"server_version"`
+	VaultPath       string                        `json:"vault_path"`
+	ProjectCode     string                        `json:"project_code"`
+	TaoluCount      int                           `json:"taolu_count"`
+	ArchivedCount   int                           `json:"archived_count"`
+	Groups          []string                      `json:"groups"`
+	Domains         []string                      `json:"domains"`
+	UserDomain      string                        `json:"user_domain"`
+	Authoring       string                        `json:"authoring"`
+	Uptime          string                        `json:"uptime"`
+	Installed       map[string]commands.InstalledInfo `json:"installed"`
+	ForkUpstream    string                        `json:"fork_upstream,omitempty"`
+	ForkSourceCommit string                       `json:"fork_source_commit,omitempty"`
 }
 
 // Config is the editable vault configuration exposed by the web UI.
@@ -85,6 +87,7 @@ type TaoluItem struct {
 	Tags          []string `json:"tags"`
 	LatestVersion string   `json:"latest_version"`
 	Archived      bool     `json:"archived"`
+	ForkSource    string   `json:"fork_source,omitempty"`
 }
 
 // AssetMeta describes a files/ asset without its content.
@@ -104,6 +107,7 @@ type TaoluDetail struct {
 	Assets     []AssetMeta `json:"assets"`
 	LatestVer  string      `json:"latest_version"`
 	VersionCnt int         `json:"version_count"`
+	ForkSource string      `json:"fork_source,omitempty"`
 }
 
 // ContentFile is one file's content at a version (GET /api/taolus/{name}/content).
@@ -184,6 +188,10 @@ func handleStatus(vaultPath string) http.HandlerFunc {
 			Uptime:        time.Since(startTime).Round(time.Second).String(),
 			Installed:     commands.CheckInstalledGlobal(),
 		}
+		if upstream, commit, err := vault.VaultForkInfo(repo); err == nil {
+			st.ForkUpstream = upstream
+			st.ForkSourceCommit = commit
+		}
 		for _, t := range taolus {
 			if t.Name == vault.SeedName {
 				st.Authoring = t.LatestVersion
@@ -255,16 +263,17 @@ func handleTaolus(vaultPath string) http.HandlerFunc {
 						continue
 					}
 				}
-				items = append(items, TaoluItem{
-					Name:          t.Name,
-					Group:         t.Group,
-					Domain:        t.Domain,
-					Mode:          t.Mode,
-					Description:   t.Description,
-					Tags:          splitTags(t.Tags),
-					LatestVersion: t.LatestVersion,
-					Archived:      archived,
-				})
+			items = append(items, TaoluItem{
+				Name:          t.Name,
+				Group:         t.Group,
+				Domain:        t.Domain,
+				Mode:          t.Mode,
+				Description:   t.Description,
+				Tags:          splitTags(t.Tags),
+				LatestVersion: t.LatestVersion,
+				Archived:      archived,
+				ForkSource:    t.ForkSource,
+			})
 			}
 			return nil
 		}
@@ -337,6 +346,9 @@ func handleTaolu(vaultPath string) http.HandlerFunc {
 			Action:    action,
 			Assets:    meta,
 			VersionCnt: len(hist),
+		}
+		if f, err := vault.ReadForkInfo(repo, vault.TaoluRef{Domain: d.Domain, Group: d.Group, Name: name}); err == nil && f != nil {
+			d.ForkSource = f.Source.String()
 		}
 		if len(hist) > 0 {
 			d.LatestVer = hist[len(hist)-1].Label

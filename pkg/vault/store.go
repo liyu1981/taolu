@@ -23,6 +23,7 @@ type TaoluInfo struct {
 	Tags          string
 	LatestVersion string
 	LatestUUID    string
+	ForkSource    string // full ref of the taolu this one was forked from, or ""
 }
 
 // PracticeVersion is one version of a taolu. Path is the SKILL.md path the
@@ -281,6 +282,9 @@ func listTaoluWithDomain(r *libfossil.Repo, wantArchived bool, domainFilter stri
 			Description: meta.Description,
 			Tags:        meta.Metadata["tags"],
 		}
+		if f, err := ReadForkInfo(r, ref); err == nil && f != nil {
+			info.ForkSource = f.Source.String()
+		}
 		if len(hist) > 0 {
 			info.LatestVersion = hist[len(hist)-1].Label
 			info.LatestUUID = hist[len(hist)-1].UUID
@@ -450,7 +454,9 @@ func versionLabel(r *libfossil.Repo, path, uuid string) string {
 // A version is recorded when either SKILL.md or its sibling ACTION.md changes:
 // the taolu is one unit. Following the origin marker, history continues across
 // renames: a taolu renamed from an older path keeps that path's versions under
-// the same v1..vN sequence.
+// the same v1..vN sequence. Following the fork marker, a forked taolu's history
+// begins with the copied upstream lineage and then continues with its own
+// independent saves.
 func SkillHistory(r *libfossil.Repo, path string) ([]PracticeVersion, error) {
 	var combined []PracticeVersion
 	seen := map[string]bool{}
@@ -460,11 +466,14 @@ func SkillHistory(r *libfossil.Repo, path string) ([]PracticeVersion, error) {
 			return nil
 		}
 		seen[p] = true
-		hist, origin, err := skillHistorySegment(r, p)
+		hist, origin, forkSrc, err := skillHistorySegment(r, p)
 		if err != nil {
 			return err
 		}
 		if err := walk(originPathToSkill(origin)); err != nil {
+			return err
+		}
+		if err := walk(forkPathToSkill(forkSrc)); err != nil {
 			return err
 		}
 		combined = append(combined, hist...)
@@ -480,17 +489,19 @@ func SkillHistory(r *libfossil.Repo, path string) ([]PracticeVersion, error) {
 }
 
 // skillHistorySegment computes the versions recorded while SKILL.md lived at
-// path (oldest first) and the origin directory the taolu was renamed from, if
-// any. Each version carries the path it was recorded under.
+// path (oldest first), the origin directory the taolu was renamed from, if
+// any, and the source ref the taolu was forked from, if any. Each version
+// carries the path it was recorded under.
 //
 // A version is recorded when the taolu's content file set — SKILL.md,
 // ACTION.md, and files/**, compared by blob UUID — changes between consecutive
-// check-ins. Metadata markers (.archived, origin) and stray files do not count.
-func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, string, error) {
+// check-ins. Metadata markers (.archived, origin, .fork) and stray files do not
+// count.
+func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, string, string, error) {
 	dir := filepath.Dir(path)
 	entries, err := r.Timeline(libfossil.TimelineOpts{})
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 	var rev []PracticeVersion
 	prev := map[string]string(nil)
@@ -501,7 +512,7 @@ func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, str
 		}
 		files, err := r.ListFiles(e.RID)
 		if err != nil {
-			return nil, "", err
+			return nil, "", "", err
 		}
 		cur := contentFilesInDir(files, dir)
 		if len(cur) == 0 {
@@ -535,12 +546,18 @@ func skillHistorySegment(r *libfossil.Repo, path string) ([]PracticeVersion, str
 		out[i] = rev[len(rev)-1-i]
 	}
 	origin := ""
+	forkSrc := ""
 	if newestUUID != "" {
 		if data, err := r.ReadFileAt(newestUUID, filepath.Join(dir, originMarker)); err == nil {
 			origin = strings.TrimSpace(string(data))
 		}
+		if data, err := r.ReadFileAt(newestUUID, filepath.Join(dir, forkMarker)); err == nil {
+			if f, ok := ParseForkInfo(string(data)); ok {
+				forkSrc = f.Source.String()
+			}
+		}
 	}
-	return out, origin, nil
+	return out, origin, forkSrc, nil
 }
 
 // contentFilesInDir returns the blob UUID of each of a taolu's content files
