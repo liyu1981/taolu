@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -66,10 +67,10 @@ func RegisterTaoluTools(server *mcp.Server) {
 		Domain  string `json:"domain,omitempty" jsonschema:"domain folder, e.g. @local, @liyu1981; defaults to @local or user-domain"`
 		Skill   string `json:"skill" jsonschema:"full SKILL.md content including YAML frontmatter (required)"`
 		Action  string `json:"action" jsonschema:"full ACTION.md content including YAML frontmatter (required)"`
-		Files   []struct {
-			Path    string `json:"path" jsonschema:"asset path relative to the files/ directory, e.g. Button.tsx or components/Button.tsx (required)"`
-			Content string `json:"content" jsonschema:"asset file content (required)"`
-		} `json:"files,omitempty" jsonschema:"optional files/ assets: each {path, content} pair is committed as a support file of the taolu"`
+		Files []struct {
+			Path     string `json:"path" jsonschema:"asset path relative to the files/ directory, e.g. Button.tsx or components/Button.tsx (required)"`
+			FilePath string `json:"file_path" jsonschema:"absolute or workspace-relative path to a local file to read and attach as a support file (required)"`
+		} `json:"files,omitempty" jsonschema:"optional files/ assets: each {path, file_path} pair reads the local file and commits it as a support file of the taolu"`
 		VersionLabel string `json:"version_label,omitempty" jsonschema:"explicit version label; defaults to the next vN for this taolu"`
 		Message      string `json:"message,omitempty" jsonschema:"commit message describing the change"`
 		User         string `json:"user,omitempty" jsonschema:"author to record; defaults to admin"`
@@ -94,7 +95,11 @@ func RegisterTaoluTools(server *mcp.Server) {
 		}
 		assets := make([]vault.Asset, 0, len(args.Files))
 		for _, f := range args.Files {
-			assets = append(assets, vault.Asset{Path: f.Path, Content: f.Content})
+			data, err := os.ReadFile(f.FilePath)
+			if err != nil {
+				return nil, nil, fmt.Errorf("read file %q: %w", f.FilePath, err)
+			}
+			assets = append(assets, vault.Asset{Path: f.Path, Content: string(data)})
 		}
 		r, p, err := vault.OpenVault(args.Path)
 		if err != nil {
