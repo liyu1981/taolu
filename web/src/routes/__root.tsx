@@ -1,5 +1,5 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
-import { Archive, BookOpen, Database, Settings } from "lucide-react";
+import { Archive, BookOpen, Database, Plug, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParticleBackdrop } from "@/components/particle-backdrop";
 
@@ -11,6 +11,7 @@ function RootLayout() {
   const links = [
     { to: "/status", label: "Status", icon: Database },
     { to: "/browse", label: "Browse", icon: BookOpen },
+    { to: "/mcp", label: "MCP", icon: Plug },
     { to: "/settings", label: "Settings", icon: Settings },
   ];
   return (
