@@ -17,6 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/yli/taolu/pkg/logreq"
 	"github.com/yli/taolu/pkg/tools"
 	"github.com/yli/taolu/pkg/version"
 	"github.com/yli/taolu/pkg/web"
@@ -56,6 +57,8 @@ Examples:
 		return
 	}
 
+	log.Printf("%s starting (components: %s)", serverName, *with)
+
 	var shutdowns []func()
 	if components["httpmcp"] {
 		shutdowns = append(shutdowns, startMCPServer())
@@ -66,7 +69,7 @@ Examples:
 		}
 	}
 	if len(shutdowns) == 0 {
-		log.Fatal("no components to start; use --with=httpmcp,web or --with=stdio")
+		log.Fatalf("%s no components to start; use --with=httpmcp,web or --with=stdio", serverName)
 	}
 	waitForShutdown(shutdowns)
 }
@@ -81,13 +84,13 @@ func parseComponents(s string) map[string]bool {
 			continue
 		}
 		if !valid[part] {
-			log.Fatalf("unknown component %q (valid: httpmcp, web, stdio)", part)
+			log.Fatalf("%s unknown component %q (valid: httpmcp, web, stdio)", serverName, part)
 		}
 		result[part] = true
 	}
 	// stdio is exclusive
 	if result["stdio"] && (result["httpmcp"] || result["web"]) {
-		log.Fatal("--with=stdio is mutually exclusive with httpmcp and web")
+		log.Fatalf("%s --with=stdio is mutually exclusive with httpmcp and web", serverName)
 	}
 	return result
 }
@@ -95,10 +98,10 @@ func parseComponents(s string) map[string]bool {
 func runStdio() {
 	server, err := newServer()
 	if err != nil {
-		log.Fatalf("failed to create server: %v", err)
+		log.Fatalf("%s failed to create server: %v", serverName, err)
 	}
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
-		log.Printf("Server failed: %v", err)
+		log.Printf("%s server failed: %v", serverName, err)
 		os.Exit(1)
 	}
 }
@@ -108,20 +111,20 @@ func runStdio() {
 func startMCPServer() func() {
 	server, err := newServer()
 	if err != nil {
-		log.Fatalf("failed to create server: %v", err)
+		log.Fatalf("%s failed to create server: %v", serverName, err)
 	}
-	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+	handler := logreq.Middleware(mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return server
-	}, &mcp.StreamableHTTPOptions{})
+	}, &mcp.StreamableHTTPOptions{}))
 	httpServer := &http.Server{
 		Addr:    listenAddr(),
 		Handler: handler,
 	}
-	log.Printf("%s MCP server listening on http://%s", serverName, httpServer.Addr)
+	log.Printf("%s %s listening on http://%s", serverName, "MCP", httpServer.Addr)
 
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("server failed: %v", err)
+			log.Fatalf("%s MCP server failed: %v", serverName, err)
 		}
 	}()
 
@@ -138,43 +141,47 @@ func startWebServer() func() {
 	}
 	port := webPort()
 	if port == 0 {
-		log.Printf("web UI disabled (TAOLU_WEB_PORT=0)")
+		log.Printf("%s %s", serverName, "web UI disabled (TAOLU_WEB_PORT=0)")
 		return nil
 	}
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	webServer := &http.Server{
 		Addr:    addr,
-		Handler: web.NewHandler(""),
+		Handler: logreq.Middleware(web.NewHandler("")),
 	}
 	go func() {
 		if err := webServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("web server failed: %v", err)
+			log.Printf("%s web server failed: %v", serverName, err)
 		}
 	}()
-	log.Printf("web UI listening on http://%s", webServer.Addr)
+	log.Printf("%s %s listening on http://%s", serverName, "web", webServer.Addr)
 	return func() { shutdownServer(webServer) }
 }
 
 // shutdownServer gracefully stops an http.Server with a short timeout.
 func shutdownServer(s *http.Server) {
+	log.Printf("%s shutting down %s ...", serverName, s.Addr)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := s.Shutdown(ctx); err != nil {
-		log.Printf("graceful shutdown: %v; closing", err)
+		log.Printf("%s graceful shutdown: %v; force closing", serverName, err)
 		if cerr := s.Close(); cerr != nil {
-			log.Printf("close: %v", cerr)
+			log.Printf("%s close: %v", serverName, cerr)
 		}
 	}
+	log.Printf("%s %s stopped", serverName, s.Addr)
 }
 
 // waitForShutdown blocks until SIGINT/SIGTERM, then runs the shutdown funcs.
 func waitForShutdown(stops []func()) {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
+	sig := <-stop
+	log.Printf("%s received %s, shutting down...", serverName, sig)
 	for _, s := range stops {
 		s()
 	}
+	log.Printf("%s all components stopped", serverName)
 }
 
 // webPort returns the web UI port: TAOLU_WEB_PORT if set (0 disables), else the
@@ -183,7 +190,7 @@ func webPort() int {
 	if p := os.Getenv("TAOLU_WEB_PORT"); p != "" {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 0 || n > 65535 {
-			log.Printf("invalid TAOLU_WEB_PORT %q, using default", p)
+			log.Printf("%s invalid TAOLU_WEB_PORT %q, using default", serverName, p)
 		} else {
 			return n
 		}
