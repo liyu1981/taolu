@@ -18,82 +18,106 @@ const taoluCmd = `---
 description: "Interact with the taolu practice vault"
 agent: build
 ---
-You are a taolu assistant. The user invoked /taolu with:
-$ARGUMENTS
+Route a taolu request to the right vault tool and carry it out.
 
-The taolu MCP server provides these tools:
-- taolu_list: search and list taolus by query, tag, or group
-- taolu_get: read a taolu's SKILL.md and ACTION.md at a version
-- taolu_apply: apply, install, or enforce a taolu into the project
-- taolu_save: save a new taolu to the vault
-- taolu_history: list version history of a taolu
-- taolu_diff: diff between two versions
-- taolu_delete: archive a taolu
-- taolu_restore: restore an archived taolu
-- taolu_rename: rename a taolu
-- taolu_info: show vault metadata
-- taolu_export: export full taolu content with all assets
-- taolu_install_commands: install slash commands for an agent tool
-- taolu_list_archived: list archived taolus
+**Input**: free-form request in $ARGUMENTS (a question, a taolu name, or an
+action to perform).
+**Output**: the result of the chosen tool, summarized for the user.
 
-If the vault is not initialized, tell the user to run "taolu init" in their terminal.
+Guidelines:
+- Interpret the intent; when ambiguous, run taolu_list first and confirm.
+- If the vault is missing, tell the user to run "taolu init" in their terminal.
+- Use exact names taken from listings; never guess a taolu name.
+- Prefer read-only tools (list/get/history/diff) unless a change is requested.
 
-Interpret the user's intent and use the appropriate tool.
-If the request is ambiguous, list available taolus first with taolu_list.
+Goal: the user's request is resolved with the correct tool in minimal steps,
+with no unconfirmed changes to the vault.
 `
 
 const taoluListCmd = `---
 description: "List available taolus in the vault"
 agent: build
 ---
-List all taolus in the vault.
-Optional filter: $ARGUMENTS
+Show which practices exist in the vault so the user can pick one.
 
-Use the taolu_list tool. Format the output as a readable table showing
-group, name, version, action mode, and description.
+**Input**: optional filter in $ARGUMENTS (query text, tag, group, or domain).
+**Output**: a readable table of matches: group/name, version, mode, description.
+
+Guidelines:
+- Use taolu_list; map the filter words to its query/tag/group/domain params.
+- Apply filters exactly as given; do not silently broaden them.
+- When nothing matches, say so and suggest taolu_list_archived for archived
+  items.
+- Do not truncate results without saying how many were hidden.
+
+Goal: the user can identify the right taolu at a glance, including its latest
+version and action mode.
 `
 
 const taoluApplyCmd = `---
 description: "Apply a taolu to this project"
 agent: build
 ---
-Apply the taolu: $ARGUMENTS
+Install a practice into this project via taolu_apply.
 
-Use the taolu_apply tool with mode "enforce" to install the skill and add
-a reference to AGENTS.md. Get user approval before writing any files.
-If the taolu name is not specified, list available taolus first.
+**Input**: a taolu name/ref in $ARGUMENTS, optionally with a version or format
+(e.g. "@local/workflows/go-lint v2").
+**Output**: confirmation of what was written where (skill path, pin file,
+AGENTS.md reference), or returned content for apply mode.
+
+Guidelines:
+- If the name is ambiguous or missing, list candidates with taolu_list and
+  confirm before applying.
+- Get explicit user approval before writing any files.
+- Never overwrite an existing SKILL.md unless the user explicitly asks for
+  force.
+- After install/enforce, report the pinned version and installed path.
+
+Goal: the intended practice is applied at the intended version and format,
+with no files written or overwritten beyond what the user approved.
 `
 
 const taoluAuthorCmd = `---
 description: "Author a new taolu from project conventions"
 agent: build
 ---
-Author a new taolu. Scope: $ARGUMENTS
+Draft a new taolu that captures the durable conventions of this project.
 
-Follow the taolu-authoring guide:
-1. Confirm the taolu's scope before surveying the project
-2. Confirm the action mode (apply, install, or enforce)
-3. Survey the project: README, AGENTS.md, module structure, tooling
-4. Extract durable conventions
-5. Write SKILL.md with YAML frontmatter
-6. Collect any asset files the skill or action references (paths relative to files/)
-7. Write ACTION.md with the confirmed mode
-8. Review briefly and get explicit approval before saving (for assets, list the files/ paths, not their contents)
+**Input**: scope/topic in $ARGUMENTS (what the practice should cover).
+**Output**: drafted SKILL.md + ACTION.md plus proposed files/ asset paths,
+presented for review — not saved.
+
+Guidelines:
+- Follow the taolu-authoring guide: confirm scope and action mode before
+  surveying.
+- Survey README, AGENTS.md, module structure, and tooling before writing.
+- Capture durable conventions only; exclude one-off details and secrets.
+- Keep SKILL.md concise; put reusable code in files/ assets referenced by
+  path.
+- During review, list asset paths only (never their full contents).
+
+Goal: the user approves a draft that accurately reflects real project
+conventions and is ready to save unchanged.
 `
 
 const taoluSaveCmd = `---
 description: "Save a taolu to the vault"
 agent: build
 ---
-Save a taolu to the vault: $ARGUMENTS
+Commit an approved draft to the vault as a new version via taolu_save.
 
-Use the taolu_save tool. Ensure:
-- Name is a valid slug (lowercase alphanumeric with single hyphens)
-- Group is specified (e.g. backend, frontend, workflows, meta)
-- SKILL.md has valid frontmatter (name, description)
-- ACTION.md has a valid mode (apply, install, or enforce)
-- Files the skill or action references are passed as files/ assets and saved
-  together with skill and action in this same call
-- Get user approval before saving; confirm briefly and list asset paths only,
-  not their contents
+**Input**: approved SKILL.md and ACTION.md content, plus local paths for any
+files/ assets.
+**Output**: saved ref (@domain/group/name), version label, total versions, and
+asset count.
+
+Guidelines:
+- Validate before calling: slug name, SKILL.md frontmatter (name,
+  description), ACTION.md mode (apply/install/enforce).
+- Attach every file the skill references via file_path; the server reads them.
+- Get explicit approval first; confirm asset paths only, not their contents.
+- Refuse to save over an archived taolu; restore it first.
+
+Goal: a clean new version exists in the vault containing the approved content
+with every referenced asset attached.
 `
