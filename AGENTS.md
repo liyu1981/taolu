@@ -57,3 +57,7 @@ For `fix` commits the body **must** contain both:
 
 <!-- taolu-enforce:glass-webui-design -->
 - Follow the taolu glass-webui-design (v1) in .opencode/skills/glass-webui-design/SKILL.md
+
+
+<!-- taolu-enforce:git-workflow -->
+- Follow the taolu git-workflow (v1) in .opencode/skills/git-workflow/SKILL.md
